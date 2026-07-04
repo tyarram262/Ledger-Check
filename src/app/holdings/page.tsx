@@ -5,6 +5,7 @@ import LotForm from "@/components/LotForm";
 import SaleForm from "@/components/SaleForm";
 import HoldingsTable from "@/components/HoldingsTable";
 import SalesTable from "@/components/SalesTable";
+import CsvImport from "@/components/CsvImport";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,12 @@ export default function HoldingsPage() {
           it twice with each date and cost.
         </p>
         <LotForm accounts={accounts} />
+        <div className="mt-5 border-t border-slate-100 pt-4">
+          <h3 className="mb-2 text-sm font-semibold text-slate-700">
+            …or import a CSV
+          </h3>
+          <CsvImport accounts={accounts} />
+        </div>
         <div className="mt-6">
           <HoldingsTable lots={lots} />
         </div>

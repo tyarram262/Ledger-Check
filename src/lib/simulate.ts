@@ -14,6 +14,7 @@ import {
   type WashSaleWarning,
 } from "@/lib/washSale";
 import { addDays } from "@/lib/dates";
+import { buildPositions } from "@/lib/valuation";
 
 export type Severity = "ok" | "caution" | "warning";
 
@@ -49,18 +50,17 @@ export function simulateTrade(
   trade: SimulatedTrade,
   lots: Lot[],
   sales: Sale[],
-  today: string
+  today: string,
+  prices: Map<string, number> = new Map()
 ): SimulationOutcome {
   const ticker = trade.ticker.toUpperCase();
   const sector = sectorFor(ticker);
 
-  const beforePositions = lots.map((l) => ({
-    ticker: l.ticker,
-    value: l.shares * l.costPerShare,
-  }));
+  const beforePositions = buildPositions(lots, prices);
 
-  // "After" portfolio, valued at cost basis: a buy adds what you'd pay; a
-  // sell removes the basis of the shares sold (proceeds become untracked cash).
+  // "After" portfolio: a buy adds what you'd pay; a sell removes the value of
+  // the shares sold (at the live price when known, else their cost basis) —
+  // proceeds become untracked cash.
   const afterPositions = [...beforePositions];
   let sellPreview: SimulationResult["sellPreview"] = null;
 
@@ -88,8 +88,8 @@ export function simulateTrade(
       avgCostPerShare: preview.avgCostPerShare,
       realizedGainLoss: preview.realizedGainLoss,
     };
-    const basisRemoved = preview.sharesSold * preview.avgCostPerShare;
-    afterPositions.push({ ticker, value: -basisRemoved });
+    const unitValue = prices.get(ticker) ?? preview.avgCostPerShare;
+    afterPositions.push({ ticker, value: -(preview.sharesSold * unitValue) });
   }
 
   const before: AllocationSnapshot = (() => {

@@ -20,12 +20,21 @@ For the AI digest, add your key to `.env.local`:
 GEMINI_API_KEY=your-key-here
 ```
 
+Run the unit tests (wash-sale windows, FIFO, concentration, CSV parsing):
+
+```bash
+npm test
+```
+
 ## Pages
 
 - **/** — Dashboard: sector allocation donut, concentration score
-  (>25% in one sector = elevated, >40% = high), AI risk digest.
+  (>25% in one sector = elevated, >40% = high), AI risk digest, and a
+  "Refresh prices" button that pulls current quotes (Yahoo Finance,
+  unofficial endpoint) so allocations use market value instead of cost.
 - **/holdings** — Enter accounts, purchase lots, and past sales (past sales
-  power the wash-sale check).
+  power the wash-sale check). Also imports brokerage CSV exports — needs
+  symbol, quantity, cost (per-share or total), and date columns.
 - **/simulate** — The core feature: enter a hypothetical trade, see the
   before/after sector allocation and a one-sentence verdict, with wash-sale
   warnings in both directions:
@@ -36,10 +45,11 @@ GEMINI_API_KEY=your-key-here
 
 ## MVP simplifications (deliberate)
 
-- Portfolio values use **cost basis** (no live price feed).
+- Prices come from an unofficial Yahoo Finance endpoint, refreshed only on
+  demand; tickers without a stored quote fall back to **cost basis**.
 - Sector mapping is a static local table (`src/data/sector-map.json`,
-  ~100 common tickers); ETFs map to a single "primary tilt" sector, not a
-  true look-through.
+  all S&P 500 constituents + ~24 popular ETFs); ETFs map to a single
+  "primary tilt" sector, not a true look-through.
 - Wash-sale check is **binary** — any ticker match in the window flags,
   regardless of share counts (the real rule disallows losses proportionally).
 - "Substantially identical" means same ticker only (no fund matching).

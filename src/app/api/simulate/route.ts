@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { listLots, listSales } from "@/lib/queries";
 import { simulateTrade } from "@/lib/simulate";
 import { todayIso } from "@/lib/dates";
+import { getStoredQuotes, toPriceMap } from "@/lib/quotes";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -22,11 +23,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errors.join(" ") }, { status: 400 });
   }
 
+  const lots = listLots();
+  const prices = toPriceMap(
+    getStoredQuotes([...new Set(lots.map((l) => l.ticker))])
+  );
   const outcome = simulateTrade(
     { side, ticker, shares, pricePerShare, accountId },
-    listLots(),
+    lots,
     listSales(),
-    todayIso()
+    todayIso(),
+    prices
   );
   if (!outcome.ok) {
     return NextResponse.json({ error: outcome.error }, { status: 400 });

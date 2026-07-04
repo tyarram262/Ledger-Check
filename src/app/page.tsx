@@ -7,8 +7,11 @@ import {
 } from "@/lib/concentration";
 import { lookupSecurity } from "@/lib/sectors";
 import { formatUsd } from "@/lib/format";
+import { getStoredQuotes, toPriceMap } from "@/lib/quotes";
+import { buildPositions, splitPricedTickers } from "@/lib/valuation";
 import SectorChart from "@/components/SectorChart";
 import DigestCard from "@/components/DigestCard";
+import RefreshPricesButton from "@/components/RefreshPricesButton";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +23,13 @@ const LEVEL_STYLES: Record<ConcentrationLevel, string> = {
 
 export default function DashboardPage() {
   const lots = listLots();
-  const positions = lots.map((l) => ({
-    ticker: l.ticker,
-    value: l.shares * l.costPerShare,
-  }));
+  const quotes = getStoredQuotes([...new Set(lots.map((l) => l.ticker))]);
+  const prices = toPriceMap(quotes);
+  const positions = buildPositions(lots, prices);
+  const { priced, unpriced } = splitPricedTickers(lots, prices);
+  const oldestFetch = [...quotes.values()]
+    .map((q) => q.fetchedAt)
+    .sort()[0];
   const slices = sectorAllocation(positions);
   const verdict = concentrationVerdict(slices);
   const totalValue = positions.reduce((sum, p) => sum + p.value, 0);
@@ -54,12 +60,19 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-slate-500">
-          Portfolio total: {formatUsd(totalValue)}
-          <span className="ml-1 text-xs text-slate-400">
-            (at cost basis — no live prices in MVP)
-          </span>
-        </p>
+        <div className="flex flex-wrap items-baseline gap-3">
+          <p className="text-sm text-slate-500">
+            Portfolio total: {formatUsd(totalValue)}
+            <span className="ml-1 text-xs text-slate-400">
+              {priced.length === 0
+                ? "(at cost basis — refresh to fetch live prices)"
+                : unpriced.length === 0
+                  ? `(live prices as of ${new Date(oldestFetch!).toLocaleString()})`
+                  : `(${priced.length} of ${priced.length + unpriced.length} tickers at live prices; ${unpriced.join(", ")} at cost)`}
+            </span>
+          </p>
+          <RefreshPricesButton />
+        </div>
       </div>
 
       <div

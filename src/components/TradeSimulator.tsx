@@ -272,8 +272,8 @@ export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
               })}
             </ul>
             <p className="mt-3 text-xs text-slate-400">
-              Light bar = current, dark bar = after this trade. Values at cost
-              basis.
+              Light bar = current, dark bar = after this trade. Values use
+              live prices where available, otherwise cost basis.
             </p>
           </section>
 

@@ -3,6 +3,8 @@ import { getDb } from "@/lib/db";
 import { listLots } from "@/lib/queries";
 import { concentrationVerdict, sectorAllocation } from "@/lib/concentration";
 import { lookupSecurity } from "@/lib/sectors";
+import { getStoredQuotes, toPriceMap } from "@/lib/quotes";
+import { buildPositions } from "@/lib/valuation";
 import type { Lot } from "@/lib/types";
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
@@ -37,10 +39,10 @@ export function getCachedDigest(): Digest | null {
 }
 
 function buildPrompt(lots: Lot[]): string {
-  const positions = lots.map((l) => ({
-    ticker: l.ticker,
-    value: l.shares * l.costPerShare,
-  }));
+  const prices = toPriceMap(
+    getStoredQuotes([...new Set(lots.map((l) => l.ticker))])
+  );
+  const positions = buildPositions(lots, prices);
   const slices = sectorAllocation(positions);
   const verdict = concentrationVerdict(slices);
   const holdings = lots.map((l) => {
@@ -51,13 +53,15 @@ function buildPrompt(lots: Lot[]): string {
       sector: info?.sector ?? "Unmapped",
       isEtf: info?.isEtf ?? false,
       accountType: l.accountName,
-      dollarValueAtCost: Math.round(l.shares * l.costPerShare),
+      dollarValue: Math.round(
+        l.shares * (prices.get(l.ticker) ?? l.costPerShare)
+      ),
     };
   });
 
   return `You are a plain-English financial explainer for someone who is not a finance expert.
 
-Here is their portfolio (dollar values are at cost basis):
+Here is their portfolio (market value where available, else cost basis):
 ${JSON.stringify(holdings, null, 2)}
 
 Sector breakdown:

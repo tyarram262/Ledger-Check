@@ -1,121 +1,2661 @@
 {
-  "AAPL": { "name": "Apple Inc.", "sector": "Information Technology", "isEtf": false },
-  "MSFT": { "name": "Microsoft Corp.", "sector": "Information Technology", "isEtf": false },
-  "NVDA": { "name": "NVIDIA Corp.", "sector": "Information Technology", "isEtf": false },
-  "AVGO": { "name": "Broadcom Inc.", "sector": "Information Technology", "isEtf": false },
-  "ORCL": { "name": "Oracle Corp.", "sector": "Information Technology", "isEtf": false },
-  "CRM": { "name": "Salesforce Inc.", "sector": "Information Technology", "isEtf": false },
-  "ADBE": { "name": "Adobe Inc.", "sector": "Information Technology", "isEtf": false },
-  "AMD": { "name": "Advanced Micro Devices", "sector": "Information Technology", "isEtf": false },
-  "INTC": { "name": "Intel Corp.", "sector": "Information Technology", "isEtf": false },
-  "CSCO": { "name": "Cisco Systems", "sector": "Information Technology", "isEtf": false },
-  "QCOM": { "name": "Qualcomm Inc.", "sector": "Information Technology", "isEtf": false },
-  "TXN": { "name": "Texas Instruments", "sector": "Information Technology", "isEtf": false },
-  "IBM": { "name": "IBM Corp.", "sector": "Information Technology", "isEtf": false },
-  "NOW": { "name": "ServiceNow Inc.", "sector": "Information Technology", "isEtf": false },
-  "MU": { "name": "Micron Technology", "sector": "Information Technology", "isEtf": false },
-  "PLTR": { "name": "Palantir Technologies", "sector": "Information Technology", "isEtf": false },
-
-  "GOOGL": { "name": "Alphabet Inc. (Class A)", "sector": "Communication Services", "isEtf": false },
-  "GOOG": { "name": "Alphabet Inc. (Class C)", "sector": "Communication Services", "isEtf": false },
-  "META": { "name": "Meta Platforms", "sector": "Communication Services", "isEtf": false },
-  "NFLX": { "name": "Netflix Inc.", "sector": "Communication Services", "isEtf": false },
-  "DIS": { "name": "Walt Disney Co.", "sector": "Communication Services", "isEtf": false },
-  "TMUS": { "name": "T-Mobile US", "sector": "Communication Services", "isEtf": false },
-  "VZ": { "name": "Verizon Communications", "sector": "Communication Services", "isEtf": false },
-  "T": { "name": "AT&T Inc.", "sector": "Communication Services", "isEtf": false },
-  "CMCSA": { "name": "Comcast Corp.", "sector": "Communication Services", "isEtf": false },
-
-  "AMZN": { "name": "Amazon.com Inc.", "sector": "Consumer Discretionary", "isEtf": false },
-  "TSLA": { "name": "Tesla Inc.", "sector": "Consumer Discretionary", "isEtf": false },
-  "HD": { "name": "Home Depot", "sector": "Consumer Discretionary", "isEtf": false },
-  "MCD": { "name": "McDonald's Corp.", "sector": "Consumer Discretionary", "isEtf": false },
-  "NKE": { "name": "Nike Inc.", "sector": "Consumer Discretionary", "isEtf": false },
-  "SBUX": { "name": "Starbucks Corp.", "sector": "Consumer Discretionary", "isEtf": false },
-  "LOW": { "name": "Lowe's Companies", "sector": "Consumer Discretionary", "isEtf": false },
-  "BKNG": { "name": "Booking Holdings", "sector": "Consumer Discretionary", "isEtf": false },
-
-  "PG": { "name": "Procter & Gamble", "sector": "Consumer Staples", "isEtf": false },
-  "KO": { "name": "Coca-Cola Co.", "sector": "Consumer Staples", "isEtf": false },
-  "PEP": { "name": "PepsiCo Inc.", "sector": "Consumer Staples", "isEtf": false },
-  "COST": { "name": "Costco Wholesale", "sector": "Consumer Staples", "isEtf": false },
-  "WMT": { "name": "Walmart Inc.", "sector": "Consumer Staples", "isEtf": false },
-  "PM": { "name": "Philip Morris International", "sector": "Consumer Staples", "isEtf": false },
-  "CL": { "name": "Colgate-Palmolive", "sector": "Consumer Staples", "isEtf": false },
-
-  "BRK.B": { "name": "Berkshire Hathaway (Class B)", "sector": "Financials", "isEtf": false },
-  "JPM": { "name": "JPMorgan Chase", "sector": "Financials", "isEtf": false },
-  "V": { "name": "Visa Inc.", "sector": "Financials", "isEtf": false },
-  "MA": { "name": "Mastercard Inc.", "sector": "Financials", "isEtf": false },
-  "BAC": { "name": "Bank of America", "sector": "Financials", "isEtf": false },
-  "WFC": { "name": "Wells Fargo", "sector": "Financials", "isEtf": false },
-  "GS": { "name": "Goldman Sachs", "sector": "Financials", "isEtf": false },
-  "MS": { "name": "Morgan Stanley", "sector": "Financials", "isEtf": false },
-  "AXP": { "name": "American Express", "sector": "Financials", "isEtf": false },
-  "C": { "name": "Citigroup Inc.", "sector": "Financials", "isEtf": false },
-  "SCHW": { "name": "Charles Schwab", "sector": "Financials", "isEtf": false },
-
-  "LLY": { "name": "Eli Lilly & Co.", "sector": "Health Care", "isEtf": false },
-  "UNH": { "name": "UnitedHealth Group", "sector": "Health Care", "isEtf": false },
-  "JNJ": { "name": "Johnson & Johnson", "sector": "Health Care", "isEtf": false },
-  "ABBV": { "name": "AbbVie Inc.", "sector": "Health Care", "isEtf": false },
-  "MRK": { "name": "Merck & Co.", "sector": "Health Care", "isEtf": false },
-  "PFE": { "name": "Pfizer Inc.", "sector": "Health Care", "isEtf": false },
-  "TMO": { "name": "Thermo Fisher Scientific", "sector": "Health Care", "isEtf": false },
-  "ABT": { "name": "Abbott Laboratories", "sector": "Health Care", "isEtf": false },
-  "AMGN": { "name": "Amgen Inc.", "sector": "Health Care", "isEtf": false },
-
-  "XOM": { "name": "Exxon Mobil", "sector": "Energy", "isEtf": false },
-  "CVX": { "name": "Chevron Corp.", "sector": "Energy", "isEtf": false },
-  "COP": { "name": "ConocoPhillips", "sector": "Energy", "isEtf": false },
-  "SLB": { "name": "Schlumberger", "sector": "Energy", "isEtf": false },
-
-  "CAT": { "name": "Caterpillar Inc.", "sector": "Industrials", "isEtf": false },
-  "GE": { "name": "GE Aerospace", "sector": "Industrials", "isEtf": false },
-  "HON": { "name": "Honeywell International", "sector": "Industrials", "isEtf": false },
-  "UNP": { "name": "Union Pacific", "sector": "Industrials", "isEtf": false },
-  "BA": { "name": "Boeing Co.", "sector": "Industrials", "isEtf": false },
-  "RTX": { "name": "RTX Corp.", "sector": "Industrials", "isEtf": false },
-  "DE": { "name": "Deere & Co.", "sector": "Industrials", "isEtf": false },
-  "LMT": { "name": "Lockheed Martin", "sector": "Industrials", "isEtf": false },
-  "UPS": { "name": "United Parcel Service", "sector": "Industrials", "isEtf": false },
-
-  "LIN": { "name": "Linde plc", "sector": "Materials", "isEtf": false },
-  "SHW": { "name": "Sherwin-Williams", "sector": "Materials", "isEtf": false },
-  "FCX": { "name": "Freeport-McMoRan", "sector": "Materials", "isEtf": false },
-  "NEM": { "name": "Newmont Corp.", "sector": "Materials", "isEtf": false },
-
-  "NEE": { "name": "NextEra Energy", "sector": "Utilities", "isEtf": false },
-  "DUK": { "name": "Duke Energy", "sector": "Utilities", "isEtf": false },
-  "SO": { "name": "Southern Co.", "sector": "Utilities", "isEtf": false },
-
-  "PLD": { "name": "Prologis Inc.", "sector": "Real Estate", "isEtf": false },
-  "AMT": { "name": "American Tower", "sector": "Real Estate", "isEtf": false },
-  "O": { "name": "Realty Income", "sector": "Real Estate", "isEtf": false },
-  "SPG": { "name": "Simon Property Group", "sector": "Real Estate", "isEtf": false },
-
-  "VTI": { "name": "Vanguard Total Stock Market ETF", "sector": "Diversified", "isEtf": true, "tiltNote": "Broad US market — no single-sector tilt" },
-  "VOO": { "name": "Vanguard S&P 500 ETF", "sector": "Diversified", "isEtf": true, "tiltNote": "Broad US large-cap — no single-sector tilt" },
-  "SPY": { "name": "SPDR S&P 500 ETF", "sector": "Diversified", "isEtf": true, "tiltNote": "Broad US large-cap — no single-sector tilt" },
-  "IVV": { "name": "iShares Core S&P 500 ETF", "sector": "Diversified", "isEtf": true, "tiltNote": "Broad US large-cap — no single-sector tilt" },
-  "QQQ": { "name": "Invesco QQQ Trust", "sector": "Information Technology", "isEtf": true, "tiltNote": "Nasdaq-100 — heavy tech tilt, mapped to Information Technology" },
-  "VUG": { "name": "Vanguard Growth ETF", "sector": "Information Technology", "isEtf": true, "tiltNote": "US growth — heavy tech tilt, mapped to Information Technology" },
-  "VTV": { "name": "Vanguard Value ETF", "sector": "Diversified", "isEtf": true, "tiltNote": "US value — spread across sectors" },
-  "IWM": { "name": "iShares Russell 2000 ETF", "sector": "Diversified", "isEtf": true, "tiltNote": "US small-cap — no single-sector tilt" },
-  "DIA": { "name": "SPDR Dow Jones Industrial Average ETF", "sector": "Diversified", "isEtf": true, "tiltNote": "30 large-caps across sectors" },
-  "VEA": { "name": "Vanguard FTSE Developed Markets ETF", "sector": "Diversified", "isEtf": true, "tiltNote": "International developed markets" },
-  "VWO": { "name": "Vanguard FTSE Emerging Markets ETF", "sector": "Diversified", "isEtf": true, "tiltNote": "Emerging markets" },
-  "VXUS": { "name": "Vanguard Total International Stock ETF", "sector": "Diversified", "isEtf": true, "tiltNote": "Total international market" },
-  "SCHD": { "name": "Schwab US Dividend Equity ETF", "sector": "Diversified", "isEtf": true, "tiltNote": "Dividend stocks across sectors" },
-  "VIG": { "name": "Vanguard Dividend Appreciation ETF", "sector": "Diversified", "isEtf": true, "tiltNote": "Dividend growers across sectors" },
-  "AGG": { "name": "iShares Core US Aggregate Bond ETF", "sector": "Fixed Income", "isEtf": true, "tiltNote": "US investment-grade bonds" },
-  "BND": { "name": "Vanguard Total Bond Market ETF", "sector": "Fixed Income", "isEtf": true, "tiltNote": "US investment-grade bonds" },
-  "XLK": { "name": "Technology Select Sector SPDR", "sector": "Information Technology", "isEtf": true, "tiltNote": "Pure tech sector fund" },
-  "XLF": { "name": "Financial Select Sector SPDR", "sector": "Financials", "isEtf": true, "tiltNote": "Pure financials sector fund" },
-  "XLE": { "name": "Energy Select Sector SPDR", "sector": "Energy", "isEtf": true, "tiltNote": "Pure energy sector fund" },
-  "XLV": { "name": "Health Care Select Sector SPDR", "sector": "Health Care", "isEtf": true, "tiltNote": "Pure health care sector fund" },
-  "VNQ": { "name": "Vanguard Real Estate ETF", "sector": "Real Estate", "isEtf": true, "tiltNote": "Pure real estate fund" },
-  "SMH": { "name": "VanEck Semiconductor ETF", "sector": "Information Technology", "isEtf": true, "tiltNote": "Semiconductors — mapped to Information Technology" },
-  "VGT": { "name": "Vanguard Information Technology ETF", "sector": "Information Technology", "isEtf": true, "tiltNote": "Pure tech sector fund" },
-  "GLD": { "name": "SPDR Gold Shares", "sector": "Commodities", "isEtf": true, "tiltNote": "Physical gold" }
+  "A": {
+    "name": "Agilent Technologies",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "AAPL": {
+    "name": "Apple Inc.",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "ABBV": {
+    "name": "AbbVie",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "ABNB": {
+    "name": "Airbnb",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "ABT": {
+    "name": "Abbott Laboratories",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "ACGL": {
+    "name": "Arch Capital Group",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "ACN": {
+    "name": "Accenture",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "ADBE": {
+    "name": "Adobe Inc.",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "ADI": {
+    "name": "Analog Devices",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "ADM": {
+    "name": "Archer Daniels Midland",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "ADP": {
+    "name": "Automatic Data Processing",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "ADSK": {
+    "name": "Autodesk",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "AEE": {
+    "name": "Ameren",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "AEP": {
+    "name": "American Electric Power",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "AES": {
+    "name": "AES Corporation",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "AFL": {
+    "name": "Aflac",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "AIG": {
+    "name": "American International Group",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "AIZ": {
+    "name": "Assurant",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "AJG": {
+    "name": "Arthur J. Gallagher & Co.",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "AKAM": {
+    "name": "Akamai Technologies",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "ALB": {
+    "name": "Albemarle Corporation",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "ALGN": {
+    "name": "Align Technology",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "ALL": {
+    "name": "Allstate",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "ALLE": {
+    "name": "Allegion",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "AMAT": {
+    "name": "Applied Materials",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "AMCR": {
+    "name": "Amcor",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "AMD": {
+    "name": "Advanced Micro Devices",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "AME": {
+    "name": "Ametek",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "AMGN": {
+    "name": "Amgen",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "AMP": {
+    "name": "Ameriprise Financial",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "AMT": {
+    "name": "American Tower",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "AMZN": {
+    "name": "Amazon",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "ANET": {
+    "name": "Arista Networks",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "AON": {
+    "name": "Aon plc",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "AOS": {
+    "name": "A. O. Smith",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "APA": {
+    "name": "APA Corporation",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "APD": {
+    "name": "Air Products",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "APH": {
+    "name": "Amphenol",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "APO": {
+    "name": "Apollo Global Management",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "APP": {
+    "name": "AppLovin",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "APTV": {
+    "name": "Aptiv",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "ARE": {
+    "name": "Alexandria Real Estate Equities",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "ARES": {
+    "name": "Ares Management",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "ATO": {
+    "name": "Atmos Energy",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "AVB": {
+    "name": "AvalonBay Communities",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "AVGO": {
+    "name": "Broadcom",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "AVY": {
+    "name": "Avery Dennison",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "AWK": {
+    "name": "American Water Works",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "AXON": {
+    "name": "Axon Enterprise",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "AXP": {
+    "name": "American Express",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "AZO": {
+    "name": "AutoZone",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "BA": {
+    "name": "Boeing",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "BAC": {
+    "name": "Bank of America",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "BALL": {
+    "name": "Ball Corporation",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "BAX": {
+    "name": "Baxter International",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "BBY": {
+    "name": "Best Buy",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "BDX": {
+    "name": "Becton Dickinson",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "BEN": {
+    "name": "Franklin Resources",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "BF.B": {
+    "name": "Brown–Forman",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "BG": {
+    "name": "Bunge Global",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "BIIB": {
+    "name": "Biogen",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "BKNG": {
+    "name": "Booking Holdings",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "BKR": {
+    "name": "Baker Hughes",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "BLDR": {
+    "name": "Builders FirstSource",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "BLK": {
+    "name": "BlackRock",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "BMY": {
+    "name": "Bristol Myers Squibb",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "BNY": {
+    "name": "BNY Mellon",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "BR": {
+    "name": "Broadridge Financial Solutions",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "BRK.B": {
+    "name": "Berkshire Hathaway",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "BRO": {
+    "name": "Brown & Brown",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "BSX": {
+    "name": "Boston Scientific",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "BX": {
+    "name": "Blackstone Inc.",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "BXP": {
+    "name": "BXP, Inc.",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "C": {
+    "name": "Citigroup",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "CAH": {
+    "name": "Cardinal Health",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "CARR": {
+    "name": "Carrier Global",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "CASY": {
+    "name": "Casey's",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "CAT": {
+    "name": "Caterpillar Inc.",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "CB": {
+    "name": "Chubb Limited",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "CBOE": {
+    "name": "Cboe Global Markets",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "CBRE": {
+    "name": "CBRE Group",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "CCI": {
+    "name": "Crown Castle",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "CCL": {
+    "name": "Carnival Corporation",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "CDNS": {
+    "name": "Cadence Design Systems",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "CDW": {
+    "name": "CDW Corporation",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "CEG": {
+    "name": "Constellation Energy",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "CF": {
+    "name": "CF Industries",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "CFG": {
+    "name": "Citizens Financial Group",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "CHD": {
+    "name": "Church & Dwight",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "CHRW": {
+    "name": "C.H. Robinson",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "CHTR": {
+    "name": "Charter Communications",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "CI": {
+    "name": "Cigna",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "CIEN": {
+    "name": "Ciena",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "CINF": {
+    "name": "Cincinnati Financial",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "CL": {
+    "name": "Colgate-Palmolive",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "CLX": {
+    "name": "Clorox",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "CMCSA": {
+    "name": "Comcast",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "CME": {
+    "name": "CME Group",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "CMG": {
+    "name": "Chipotle Mexican Grill",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "CMI": {
+    "name": "Cummins",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "CMS": {
+    "name": "CMS Energy",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "CNC": {
+    "name": "Centene Corporation",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "CNP": {
+    "name": "CenterPoint Energy",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "COF": {
+    "name": "Capital One",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "COHR": {
+    "name": "Coherent Corp.",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "COIN": {
+    "name": "Coinbase",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "COO": {
+    "name": "Cooper Companies (The)",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "COP": {
+    "name": "ConocoPhillips",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "COR": {
+    "name": "Cencora",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "COST": {
+    "name": "Costco",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "CPAY": {
+    "name": "Corpay",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "CPRT": {
+    "name": "Copart",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "CPT": {
+    "name": "Camden Property Trust",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "CRH": {
+    "name": "CRH plc",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "CRL": {
+    "name": "Charles River Laboratories",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "CRM": {
+    "name": "Salesforce",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "CRWD": {
+    "name": "CrowdStrike",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "CSCO": {
+    "name": "Cisco",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "CSGP": {
+    "name": "CoStar Group",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "CSX": {
+    "name": "CSX Corporation",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "CTAS": {
+    "name": "Cintas",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "CTSH": {
+    "name": "Cognizant",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "CTVA": {
+    "name": "Corteva",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "CVNA": {
+    "name": "Carvana",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "CVS": {
+    "name": "CVS Health",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "CVX": {
+    "name": "Chevron Corporation",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "D": {
+    "name": "Dominion Energy",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "DAL": {
+    "name": "Delta Air Lines",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "DASH": {
+    "name": "DoorDash",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "DD": {
+    "name": "DuPont",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "DDOG": {
+    "name": "Datadog",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "DE": {
+    "name": "Deere & Company",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "DECK": {
+    "name": "Deckers Brands",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "DELL": {
+    "name": "Dell Technologies",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "DG": {
+    "name": "Dollar General",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "DGX": {
+    "name": "Quest Diagnostics",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "DHI": {
+    "name": "D. R. Horton",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "DHR": {
+    "name": "Danaher Corporation",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "DIS": {
+    "name": "Walt Disney Company (The)",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "DLR": {
+    "name": "Digital Realty",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "DLTR": {
+    "name": "Dollar Tree",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "DOC": {
+    "name": "Healthpeak Properties",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "DOV": {
+    "name": "Dover Corporation",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "DOW": {
+    "name": "Dow Inc.",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "DPZ": {
+    "name": "Domino's",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "DRI": {
+    "name": "Darden Restaurants",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "DTE": {
+    "name": "DTE Energy",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "DUK": {
+    "name": "Duke Energy",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "DVA": {
+    "name": "DaVita",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "DVN": {
+    "name": "Devon Energy",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "DXCM": {
+    "name": "Dexcom",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "EA": {
+    "name": "Electronic Arts",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "EBAY": {
+    "name": "eBay Inc.",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "ECHO": {
+    "name": "EchoStar",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "ECL": {
+    "name": "Ecolab",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "ED": {
+    "name": "Consolidated Edison",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "EFX": {
+    "name": "Equifax",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "EG": {
+    "name": "Everest Group",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "EIX": {
+    "name": "Edison International",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "EL": {
+    "name": "Estée Lauder Companies (The)",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "ELV": {
+    "name": "Elevance Health",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "EME": {
+    "name": "Emcor",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "EMR": {
+    "name": "Emerson Electric",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "EOG": {
+    "name": "EOG Resources",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "EQIX": {
+    "name": "Equinix",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "EQR": {
+    "name": "Equity Residential",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "EQT": {
+    "name": "EQT Corporation",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "ERIE": {
+    "name": "Erie Indemnity",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "ES": {
+    "name": "Eversource Energy",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "ESS": {
+    "name": "Essex Property Trust",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "ETN": {
+    "name": "Eaton Corporation",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "ETR": {
+    "name": "Entergy",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "EVRG": {
+    "name": "Evergy",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "EW": {
+    "name": "Edwards Lifesciences",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "EXC": {
+    "name": "Exelon",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "EXE": {
+    "name": "Expand Energy",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "EXPD": {
+    "name": "Expeditors International",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "EXPE": {
+    "name": "Expedia Group",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "EXR": {
+    "name": "Extra Space Storage",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "F": {
+    "name": "Ford Motor Company",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "FANG": {
+    "name": "Diamondback Energy",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "FAST": {
+    "name": "Fastenal",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "FCX": {
+    "name": "Freeport-McMoRan",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "FDS": {
+    "name": "FactSet",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "FDX": {
+    "name": "FedEx",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "FDXF": {
+    "name": "FedEx Freight",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "FE": {
+    "name": "FirstEnergy",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "FFIV": {
+    "name": "F5, Inc.",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "FICO": {
+    "name": "Fair Isaac",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "FIS": {
+    "name": "Fidelity National Information Services",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "FISV": {
+    "name": "Fiserv",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "FITB": {
+    "name": "Fifth Third Bancorp",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "FIX": {
+    "name": "Comfort Systems USA",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "FLEX": {
+    "name": "Flex Ltd.",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "FOX": {
+    "name": "Fox Corporation (Class B)",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "FOXA": {
+    "name": "Fox Corporation (Class A)",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "FRT": {
+    "name": "Federal Realty Investment Trust",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "FSLR": {
+    "name": "First Solar",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "FTNT": {
+    "name": "Fortinet",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "FTV": {
+    "name": "Fortive",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "GD": {
+    "name": "General Dynamics",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "GDDY": {
+    "name": "GoDaddy",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "GE": {
+    "name": "GE Aerospace",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "GEHC": {
+    "name": "GE HealthCare",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "GEN": {
+    "name": "Gen Digital",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "GEV": {
+    "name": "GE Vernova",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "GILD": {
+    "name": "Gilead Sciences",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "GIS": {
+    "name": "General Mills",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "GL": {
+    "name": "Globe Life",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "GLW": {
+    "name": "Corning Inc.",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "GM": {
+    "name": "General Motors",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "GNRC": {
+    "name": "Generac",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "GOOG": {
+    "name": "Alphabet Inc. (Class C)",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "GOOGL": {
+    "name": "Alphabet Inc. (Class A)",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "GPC": {
+    "name": "Genuine Parts Company",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "GPN": {
+    "name": "Global Payments",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "GRMN": {
+    "name": "Garmin",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "GS": {
+    "name": "Goldman Sachs",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "GWW": {
+    "name": "W. W. Grainger",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "HAL": {
+    "name": "Halliburton",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "HAS": {
+    "name": "Hasbro",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "HBAN": {
+    "name": "Huntington Bancshares",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "HCA": {
+    "name": "HCA Healthcare",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "HD": {
+    "name": "Home Depot (The)",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "HIG": {
+    "name": "Hartford (The)",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "HII": {
+    "name": "Huntington Ingalls Industries",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "HLT": {
+    "name": "Hilton Worldwide",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "HON": {
+    "name": "Honeywell Technologies",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "HONA": {
+    "name": "Honeywell Aerospace",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "HOOD": {
+    "name": "Robinhood Markets",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "HPE": {
+    "name": "Hewlett Packard Enterprise",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "HPQ": {
+    "name": "HP Inc.",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "HRL": {
+    "name": "Hormel Foods",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "HSIC": {
+    "name": "Henry Schein",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "HST": {
+    "name": "Host Hotels & Resorts",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "HSY": {
+    "name": "Hershey Company (The)",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "HUBB": {
+    "name": "Hubbell Incorporated",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "HUM": {
+    "name": "Humana",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "HWM": {
+    "name": "Howmet Aerospace",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "IBKR": {
+    "name": "Interactive Brokers",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "IBM": {
+    "name": "IBM",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "ICE": {
+    "name": "Intercontinental Exchange",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "IDXX": {
+    "name": "Idexx Laboratories",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "IEX": {
+    "name": "IDEX Corporation",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "IFF": {
+    "name": "International Flavors & Fragrances",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "INCY": {
+    "name": "Incyte",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "INTC": {
+    "name": "Intel",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "INTU": {
+    "name": "Intuit",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "INVH": {
+    "name": "Invitation Homes",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "IP": {
+    "name": "International Paper",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "IQV": {
+    "name": "IQVIA",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "IR": {
+    "name": "Ingersoll Rand",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "IRM": {
+    "name": "Iron Mountain",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "ISRG": {
+    "name": "Intuitive Surgical",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "IT": {
+    "name": "Gartner",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "ITW": {
+    "name": "Illinois Tool Works",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "IVZ": {
+    "name": "Invesco",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "J": {
+    "name": "Jacobs Solutions",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "JBHT": {
+    "name": "J.B. Hunt",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "JBL": {
+    "name": "Jabil",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "JCI": {
+    "name": "Johnson Controls",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "JKHY": {
+    "name": "Jack Henry & Associates",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "JNJ": {
+    "name": "Johnson & Johnson",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "JPM": {
+    "name": "JPMorgan Chase",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "KDP": {
+    "name": "Keurig Dr Pepper",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "KEY": {
+    "name": "KeyCorp",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "KEYS": {
+    "name": "Keysight Technologies",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "KHC": {
+    "name": "Kraft Heinz",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "KIM": {
+    "name": "Kimco Realty",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "KKR": {
+    "name": "KKR & Co.",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "KLAC": {
+    "name": "KLA Corporation",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "KMB": {
+    "name": "Kimberly-Clark",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "KMI": {
+    "name": "Kinder Morgan",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "KO": {
+    "name": "Coca-Cola Company (The)",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "KR": {
+    "name": "Kroger",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "KVUE": {
+    "name": "Kenvue",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "L": {
+    "name": "Loews Corporation",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "LDOS": {
+    "name": "Leidos",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "LEN": {
+    "name": "Lennar",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "LH": {
+    "name": "Labcorp",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "LHX": {
+    "name": "L3Harris",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "LII": {
+    "name": "Lennox International",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "LIN": {
+    "name": "Linde plc",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "LITE": {
+    "name": "Lumentum",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "LLY": {
+    "name": "Lilly (Eli)",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "LMT": {
+    "name": "Lockheed Martin",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "LNT": {
+    "name": "Alliant Energy",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "LOW": {
+    "name": "Lowe's",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "LRCX": {
+    "name": "Lam Research",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "LULU": {
+    "name": "Lululemon Athletica",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "LUV": {
+    "name": "Southwest Airlines",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "LVS": {
+    "name": "Las Vegas Sands",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "LYB": {
+    "name": "LyondellBasell",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "LYV": {
+    "name": "Live Nation Entertainment",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "MA": {
+    "name": "Mastercard",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "MAA": {
+    "name": "Mid-America Apartment Communities",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "MAR": {
+    "name": "Marriott International",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "MAS": {
+    "name": "Masco",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "MCD": {
+    "name": "McDonald's",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "MCHP": {
+    "name": "Microchip Technology",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "MCK": {
+    "name": "McKesson Corporation",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "MCO": {
+    "name": "Moody's Corporation",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "MDLZ": {
+    "name": "Mondelez International",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "MDT": {
+    "name": "Medtronic",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "MET": {
+    "name": "MetLife",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "META": {
+    "name": "Meta Platforms",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "MGM": {
+    "name": "MGM Resorts",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "MKC": {
+    "name": "McCormick & Company",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "MLM": {
+    "name": "Martin Marietta Materials",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "MMM": {
+    "name": "3M",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "MNST": {
+    "name": "Monster Beverage",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "MO": {
+    "name": "Altria",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "MOS": {
+    "name": "Mosaic Company (The)",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "MPC": {
+    "name": "Marathon Petroleum",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "MPWR": {
+    "name": "Monolithic Power Systems",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "MRK": {
+    "name": "Merck & Co.",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "MRNA": {
+    "name": "Moderna",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "MRSH": {
+    "name": "Marsh McLennan",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "MRVL": {
+    "name": "Marvell Technology",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "MS": {
+    "name": "Morgan Stanley",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "MSCI": {
+    "name": "MSCI Inc.",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "MSFT": {
+    "name": "Microsoft",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "MSI": {
+    "name": "Motorola Solutions",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "MTB": {
+    "name": "M&T Bank",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "MTD": {
+    "name": "Mettler Toledo",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "MU": {
+    "name": "Micron Technology",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "NCLH": {
+    "name": "Norwegian Cruise Line Holdings",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "NDAQ": {
+    "name": "Nasdaq, Inc.",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "NDSN": {
+    "name": "Nordson Corporation",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "NEE": {
+    "name": "NextEra Energy",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "NEM": {
+    "name": "Newmont",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "NFLX": {
+    "name": "Netflix",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "NI": {
+    "name": "NiSource",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "NKE": {
+    "name": "Nike, Inc.",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "NOC": {
+    "name": "Northrop Grumman",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "NOW": {
+    "name": "ServiceNow",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "NRG": {
+    "name": "NRG Energy",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "NSC": {
+    "name": "Norfolk Southern",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "NTAP": {
+    "name": "NetApp",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "NTRS": {
+    "name": "Northern Trust",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "NUE": {
+    "name": "Nucor",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "NVDA": {
+    "name": "Nvidia",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "NVR": {
+    "name": "NVR, Inc.",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "NWS": {
+    "name": "News Corp (Class B)",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "NWSA": {
+    "name": "News Corp (Class A)",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "NXPI": {
+    "name": "NXP Semiconductors",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "O": {
+    "name": "Realty Income",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "ODFL": {
+    "name": "Old Dominion",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "OKE": {
+    "name": "Oneok",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "OMC": {
+    "name": "Omnicom Group",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "ON": {
+    "name": "ON Semiconductor",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "ORCL": {
+    "name": "Oracle Corporation",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "ORLY": {
+    "name": "O’Reilly Automotive",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "OTIS": {
+    "name": "Otis Worldwide",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "OXY": {
+    "name": "Occidental Petroleum",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "PANW": {
+    "name": "Palo Alto Networks",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "PAYX": {
+    "name": "Paychex",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "PCAR": {
+    "name": "Paccar",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "PCG": {
+    "name": "PG&E Corporation",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "PEG": {
+    "name": "Public Service Enterprise Group",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "PEP": {
+    "name": "PepsiCo",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "PFE": {
+    "name": "Pfizer",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "PFG": {
+    "name": "Principal Financial Group",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "PG": {
+    "name": "Procter & Gamble",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "PGR": {
+    "name": "Progressive Corporation",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "PH": {
+    "name": "Parker Hannifin",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "PHM": {
+    "name": "PulteGroup",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "PKG": {
+    "name": "Packaging Corporation of America",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "PLD": {
+    "name": "Prologis",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "PLTR": {
+    "name": "Palantir Technologies",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "PM": {
+    "name": "Philip Morris International",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "PNC": {
+    "name": "PNC Financial Services",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "PNR": {
+    "name": "Pentair",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "PNW": {
+    "name": "Pinnacle West Capital",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "PODD": {
+    "name": "Insulet Corporation",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "PPG": {
+    "name": "PPG Industries",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "PPL": {
+    "name": "PPL Corporation",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "PRU": {
+    "name": "Prudential Financial",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "PSA": {
+    "name": "Public Storage",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "PSKY": {
+    "name": "Paramount Skydance Corporation",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "PSX": {
+    "name": "Phillips 66",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "PTC": {
+    "name": "PTC Inc.",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "PWR": {
+    "name": "Quanta Services",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "PYPL": {
+    "name": "PayPal",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "Q": {
+    "name": "Qnity Electronics",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "QCOM": {
+    "name": "Qualcomm",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "RCL": {
+    "name": "Royal Caribbean Group",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "REG": {
+    "name": "Regency Centers",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "REGN": {
+    "name": "Regeneron Pharmaceuticals",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "RF": {
+    "name": "Regions Financial Corporation",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "RJF": {
+    "name": "Raymond James Financial",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "RL": {
+    "name": "Ralph Lauren Corporation",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "RMD": {
+    "name": "ResMed",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "ROK": {
+    "name": "Rockwell Automation",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "ROL": {
+    "name": "Rollins, Inc.",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "ROP": {
+    "name": "Roper Technologies",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "ROST": {
+    "name": "Ross Stores",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "RSG": {
+    "name": "Republic Services",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "RTX": {
+    "name": "RTX Corporation",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "RVTY": {
+    "name": "Revvity",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "SBAC": {
+    "name": "SBA Communications",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "SBUX": {
+    "name": "Starbucks",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "SCHW": {
+    "name": "Charles Schwab Corporation",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "SHW": {
+    "name": "Sherwin-Williams",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "SJM": {
+    "name": "J.M. Smucker Company (The)",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "SLB": {
+    "name": "Schlumberger",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "SMCI": {
+    "name": "Supermicro",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "SNA": {
+    "name": "Snap-on",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "SNDK": {
+    "name": "Sandisk",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "SNPS": {
+    "name": "Synopsys",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "SO": {
+    "name": "Southern Company",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "SOLV": {
+    "name": "Solventum",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "SPG": {
+    "name": "Simon Property Group",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "SPGI": {
+    "name": "S&P Global",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "SRE": {
+    "name": "Sempra",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "STE": {
+    "name": "Steris",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "STLD": {
+    "name": "Steel Dynamics",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "STT": {
+    "name": "State Street Corporation",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "STX": {
+    "name": "Seagate Technology",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "STZ": {
+    "name": "Constellation Brands",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "SW": {
+    "name": "Smurfit Westrock",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "SWK": {
+    "name": "Stanley Black & Decker",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "SWKS": {
+    "name": "Skyworks Solutions",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "SYF": {
+    "name": "Synchrony Financial",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "SYK": {
+    "name": "Stryker Corporation",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "SYY": {
+    "name": "Sysco",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "T": {
+    "name": "AT&T",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "TAP": {
+    "name": "Molson Coors Beverage Company",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "TDG": {
+    "name": "TransDigm Group",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "TDY": {
+    "name": "Teledyne Technologies",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "TECH": {
+    "name": "Bio-Techne",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "TEL": {
+    "name": "TE Connectivity",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "TER": {
+    "name": "Teradyne",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "TFC": {
+    "name": "Truist Financial",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "TGT": {
+    "name": "Target Corporation",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "TJX": {
+    "name": "TJX Companies",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "TKO": {
+    "name": "TKO Group Holdings",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "TMO": {
+    "name": "Thermo Fisher Scientific",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "TMUS": {
+    "name": "T-Mobile US",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "TPL": {
+    "name": "Texas Pacific Land Corporation",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "TPR": {
+    "name": "Tapestry, Inc.",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "TRGP": {
+    "name": "Targa Resources",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "TRMB": {
+    "name": "Trimble Inc.",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "TROW": {
+    "name": "T. Rowe Price",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "TRV": {
+    "name": "Travelers Companies (The)",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "TSCO": {
+    "name": "Tractor Supply",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "TSLA": {
+    "name": "Tesla, Inc.",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "TSN": {
+    "name": "Tyson Foods",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "TT": {
+    "name": "Trane Technologies",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "TTD": {
+    "name": "Trade Desk (The)",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "TTWO": {
+    "name": "Take-Two Interactive",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "TXN": {
+    "name": "Texas Instruments",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "TXT": {
+    "name": "Textron",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "TYL": {
+    "name": "Tyler Technologies",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "UAL": {
+    "name": "United Airlines Holdings",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "UBER": {
+    "name": "Uber",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "UDR": {
+    "name": "UDR, Inc.",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "UHS": {
+    "name": "Universal Health Services",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "ULTA": {
+    "name": "Ulta Beauty",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "UNH": {
+    "name": "UnitedHealth Group",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "UNP": {
+    "name": "Union Pacific Corporation",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "UPS": {
+    "name": "United Parcel Service",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "URI": {
+    "name": "United Rentals",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "USB": {
+    "name": "U.S. Bancorp",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "V": {
+    "name": "Visa Inc.",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "VEEV": {
+    "name": "Veeva Systems",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "VICI": {
+    "name": "Vici Properties",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "VLO": {
+    "name": "Valero Energy",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "VLTO": {
+    "name": "Veralto",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "VMC": {
+    "name": "Vulcan Materials Company",
+    "sector": "Materials",
+    "isEtf": false
+  },
+  "VRSK": {
+    "name": "Verisk Analytics",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "VRSN": {
+    "name": "Verisign",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "VRT": {
+    "name": "Vertiv",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "VRTX": {
+    "name": "Vertex Pharmaceuticals",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "VST": {
+    "name": "Vistra Corp.",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "VTR": {
+    "name": "Ventas",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "VTRS": {
+    "name": "Viatris",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "VZ": {
+    "name": "Verizon",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "WAB": {
+    "name": "Wabtec",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "WAT": {
+    "name": "Waters Corporation",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "WBD": {
+    "name": "Warner Bros. Discovery",
+    "sector": "Communication Services",
+    "isEtf": false
+  },
+  "WDAY": {
+    "name": "Workday, Inc.",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "WDC": {
+    "name": "Western Digital",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "WEC": {
+    "name": "WEC Energy Group",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "WELL": {
+    "name": "Welltower",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "WFC": {
+    "name": "Wells Fargo",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "WM": {
+    "name": "Waste Management",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "WMB": {
+    "name": "Williams Companies",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "WMT": {
+    "name": "Walmart",
+    "sector": "Consumer Staples",
+    "isEtf": false
+  },
+  "WRB": {
+    "name": "W. R. Berkley Corporation",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "WSM": {
+    "name": "Williams-Sonoma, Inc.",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "WST": {
+    "name": "West Pharmaceutical Services",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "WTW": {
+    "name": "Willis Towers Watson",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "WY": {
+    "name": "Weyerhaeuser",
+    "sector": "Real Estate",
+    "isEtf": false
+  },
+  "WYNN": {
+    "name": "Wynn Resorts",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "XEL": {
+    "name": "Xcel Energy",
+    "sector": "Utilities",
+    "isEtf": false
+  },
+  "XOM": {
+    "name": "ExxonMobil",
+    "sector": "Energy",
+    "isEtf": false
+  },
+  "XYL": {
+    "name": "Xylem Inc.",
+    "sector": "Industrials",
+    "isEtf": false
+  },
+  "XYZ": {
+    "name": "Block, Inc.",
+    "sector": "Financials",
+    "isEtf": false
+  },
+  "YUM": {
+    "name": "Yum! Brands",
+    "sector": "Consumer Discretionary",
+    "isEtf": false
+  },
+  "ZBH": {
+    "name": "Zimmer Biomet",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "ZBRA": {
+    "name": "Zebra Technologies",
+    "sector": "Information Technology",
+    "isEtf": false
+  },
+  "ZTS": {
+    "name": "Zoetis",
+    "sector": "Health Care",
+    "isEtf": false
+  },
+  "AGG": {
+    "name": "iShares Core US Aggregate Bond ETF",
+    "sector": "Fixed Income",
+    "isEtf": true,
+    "tiltNote": "US investment-grade bonds"
+  },
+  "BND": {
+    "name": "Vanguard Total Bond Market ETF",
+    "sector": "Fixed Income",
+    "isEtf": true,
+    "tiltNote": "US investment-grade bonds"
+  },
+  "DIA": {
+    "name": "SPDR Dow Jones Industrial Average ETF",
+    "sector": "Diversified",
+    "isEtf": true,
+    "tiltNote": "30 large-caps across sectors"
+  },
+  "GLD": {
+    "name": "SPDR Gold Shares",
+    "sector": "Commodities",
+    "isEtf": true,
+    "tiltNote": "Physical gold"
+  },
+  "IVV": {
+    "name": "iShares Core S&P 500 ETF",
+    "sector": "Diversified",
+    "isEtf": true,
+    "tiltNote": "Broad US large-cap — no single-sector tilt"
+  },
+  "IWM": {
+    "name": "iShares Russell 2000 ETF",
+    "sector": "Diversified",
+    "isEtf": true,
+    "tiltNote": "US small-cap — no single-sector tilt"
+  },
+  "QQQ": {
+    "name": "Invesco QQQ Trust",
+    "sector": "Information Technology",
+    "isEtf": true,
+    "tiltNote": "Nasdaq-100 — heavy tech tilt, mapped to Information Technology"
+  },
+  "SCHD": {
+    "name": "Schwab US Dividend Equity ETF",
+    "sector": "Diversified",
+    "isEtf": true,
+    "tiltNote": "Dividend stocks across sectors"
+  },
+  "SMH": {
+    "name": "VanEck Semiconductor ETF",
+    "sector": "Information Technology",
+    "isEtf": true,
+    "tiltNote": "Semiconductors — mapped to Information Technology"
+  },
+  "SPY": {
+    "name": "SPDR S&P 500 ETF",
+    "sector": "Diversified",
+    "isEtf": true,
+    "tiltNote": "Broad US large-cap — no single-sector tilt"
+  },
+  "VEA": {
+    "name": "Vanguard FTSE Developed Markets ETF",
+    "sector": "Diversified",
+    "isEtf": true,
+    "tiltNote": "International developed markets"
+  },
+  "VGT": {
+    "name": "Vanguard Information Technology ETF",
+    "sector": "Information Technology",
+    "isEtf": true,
+    "tiltNote": "Pure tech sector fund"
+  },
+  "VIG": {
+    "name": "Vanguard Dividend Appreciation ETF",
+    "sector": "Diversified",
+    "isEtf": true,
+    "tiltNote": "Dividend growers across sectors"
+  },
+  "VNQ": {
+    "name": "Vanguard Real Estate ETF",
+    "sector": "Real Estate",
+    "isEtf": true,
+    "tiltNote": "Pure real estate fund"
+  },
+  "VOO": {
+    "name": "Vanguard S&P 500 ETF",
+    "sector": "Diversified",
+    "isEtf": true,
+    "tiltNote": "Broad US large-cap — no single-sector tilt"
+  },
+  "VTI": {
+    "name": "Vanguard Total Stock Market ETF",
+    "sector": "Diversified",
+    "isEtf": true,
+    "tiltNote": "Broad US market — no single-sector tilt"
+  },
+  "VTV": {
+    "name": "Vanguard Value ETF",
+    "sector": "Diversified",
+    "isEtf": true,
+    "tiltNote": "US value — spread across sectors"
+  },
+  "VUG": {
+    "name": "Vanguard Growth ETF",
+    "sector": "Information Technology",
+    "isEtf": true,
+    "tiltNote": "US growth — heavy tech tilt, mapped to Information Technology"
+  },
+  "VWO": {
+    "name": "Vanguard FTSE Emerging Markets ETF",
+    "sector": "Diversified",
+    "isEtf": true,
+    "tiltNote": "Emerging markets"
+  },
+  "VXUS": {
+    "name": "Vanguard Total International Stock ETF",
+    "sector": "Diversified",
+    "isEtf": true,
+    "tiltNote": "Total international market"
+  },
+  "XLE": {
+    "name": "Energy Select Sector SPDR",
+    "sector": "Energy",
+    "isEtf": true,
+    "tiltNote": "Pure energy sector fund"
+  },
+  "XLF": {
+    "name": "Financial Select Sector SPDR",
+    "sector": "Financials",
+    "isEtf": true,
+    "tiltNote": "Pure financials sector fund"
+  },
+  "XLK": {
+    "name": "Technology Select Sector SPDR",
+    "sector": "Information Technology",
+    "isEtf": true,
+    "tiltNote": "Pure tech sector fund"
+  },
+  "XLV": {
+    "name": "Health Care Select Sector SPDR",
+    "sector": "Health Care",
+    "isEtf": true,
+    "tiltNote": "Pure health care sector fund"
+  }
 }

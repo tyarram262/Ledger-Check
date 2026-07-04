@@ -34,6 +34,12 @@ CREATE TABLE IF NOT EXISTS sales (
   source               TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual','recorded'))
 );
 
+CREATE TABLE IF NOT EXISTS quotes (
+  ticker     TEXT PRIMARY KEY,
+  price      REAL NOT NULL,
+  fetched_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS digest_cache (
   id             INTEGER PRIMARY KEY CHECK (id = 1),
   content        TEXT NOT NULL,

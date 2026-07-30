@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { simulateTrade } from "@/lib/simulate";
 import { makeLot, makeSale } from "@/lib/testFixtures";
+import type { Account } from "@/lib/types";
 
 const TODAY = "2026-07-03";
+
+const ACCOUNTS: Account[] = [
+  { id: 1, name: "Taxable Brokerage", type: "taxable" },
+  { id: 2, name: "Vanguard Roth", type: "roth" },
+];
 
 describe("simulateTrade — buys", () => {
   it("shows the concentration move and a clean wash-sale verdict", () => {
@@ -14,6 +20,7 @@ describe("simulateTrade — buys", () => {
       { side: "buy", ticker: "AAPL", shares: 10, pricePerShare: 100, accountId: 1 },
       lots,
       [],
+      ACCOUNTS,
       TODAY
     );
     if (!outcome.ok) throw new Error(outcome.error);
@@ -28,12 +35,26 @@ describe("simulateTrade — buys", () => {
       { side: "buy", ticker: "NVDA", shares: 1, pricePerShare: 150, accountId: 1 },
       [makeLot({ ticker: "JPM", shares: 100, costPerShare: 100 })],
       [makeSale({ ticker: "NVDA", saleDate: "2026-06-23" })],
+      ACCOUNTS,
       TODAY
     );
     if (!outcome.ok) throw new Error(outcome.error);
     expect(outcome.result.washSale?.kind).toBe("buy-after-loss");
     expect(outcome.result.severity).toBe("warning");
     expect(outcome.result.verdictSentence).toContain("would trigger a wash sale");
+  });
+
+  it("notes permanent disallowance in the verdict when repurchasing in an IRA", () => {
+    const outcome = simulateTrade(
+      { side: "buy", ticker: "NVDA", shares: 1, pricePerShare: 150, accountId: 2 },
+      [makeLot({ ticker: "JPM", shares: 100, costPerShare: 100 })],
+      [makeSale({ ticker: "NVDA", saleDate: "2026-06-23", accountId: 1 })],
+      ACCOUNTS,
+      TODAY
+    );
+    if (!outcome.ok) throw new Error(outcome.error);
+    expect(outcome.result.washSale?.isIraPermanent).toBe(true);
+    expect(outcome.result.verdictSentence).toContain("PERMANENTLY disallowed");
   });
 
   it("severity is ok for a small diversifying buy", () => {
@@ -48,6 +69,7 @@ describe("simulateTrade — buys", () => {
       { side: "buy", ticker: "NEE", shares: 1, pricePerShare: 100, accountId: 1 },
       lots,
       [],
+      ACCOUNTS,
       TODAY
     );
     if (!outcome.ok) throw new Error(outcome.error);
@@ -67,6 +89,7 @@ describe("simulateTrade — live prices", () => {
       { side: "buy", ticker: "JPM", shares: 1, pricePerShare: 100, accountId: 1 },
       lots,
       [],
+      ACCOUNTS,
       TODAY,
       prices
     );
@@ -91,6 +114,7 @@ describe("simulateTrade — live prices", () => {
       { side: "sell", ticker: "AAPL", shares: 5, pricePerShare: 300, accountId: 1 },
       lots,
       [],
+      ACCOUNTS,
       TODAY,
       prices
     );
@@ -116,6 +140,7 @@ describe("simulateTrade — sells", () => {
       { side: "sell", ticker: "AAPL", shares: 50, pricePerShare: 80, accountId: 1 },
       lots,
       [],
+      ACCOUNTS,
       TODAY
     );
     if (!outcome.ok) throw new Error(outcome.error);
@@ -129,6 +154,7 @@ describe("simulateTrade — sells", () => {
       { side: "sell", ticker: "AAPL", shares: 50, pricePerShare: 80, accountId: 1 },
       lots,
       [],
+      ACCOUNTS,
       TODAY
     );
     if (!outcome.ok) throw new Error(outcome.error);
@@ -141,6 +167,7 @@ describe("simulateTrade — sells", () => {
       { side: "sell", ticker: "AAPL", shares: 50, pricePerShare: 120, accountId: 1 },
       lots,
       [],
+      ACCOUNTS,
       TODAY
     );
     if (!outcome.ok) throw new Error(outcome.error);
@@ -152,6 +179,7 @@ describe("simulateTrade — sells", () => {
       { side: "sell", ticker: "AAPL", shares: 10, pricePerShare: 80 },
       lots,
       [],
+      ACCOUNTS,
       TODAY
     );
     expect(outcome.ok).toBe(false);
@@ -163,6 +191,7 @@ describe("simulateTrade — sells", () => {
       { side: "sell", ticker: "VTI", shares: 1, pricePerShare: 250, accountId: 1 },
       lots,
       [],
+      ACCOUNTS,
       TODAY
     );
     expect(outcome.ok).toBe(false);
@@ -174,6 +203,7 @@ describe("simulateTrade — sells", () => {
       { side: "sell", ticker: "AAPL", shares: 999, pricePerShare: 80, accountId: 1 },
       lots,
       [],
+      ACCOUNTS,
       TODAY
     );
     expect(outcome.ok).toBe(false);

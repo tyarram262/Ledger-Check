@@ -9,10 +9,10 @@ import CsvImport from "@/components/CsvImport";
 
 export const dynamic = "force-dynamic";
 
-export default function HoldingsPage() {
-  const accounts = listAccounts();
-  const lots = listLots();
-  const sales = listSales();
+export default async function HoldingsPage() {
+  const accounts = await listAccounts();
+  const lots = await listLots();
+  const sales = await listSales();
 
   return (
     <div className="space-y-8">

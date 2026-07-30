@@ -1,4 +1,4 @@
-import type { Lot, Sale } from "@/lib/types";
+import type { Account, Lot, Sale } from "@/lib/types";
 import { addDays, daysBetween } from "@/lib/dates";
 
 export const WASH_SALE_WINDOW_DAYS = 30;
@@ -9,7 +9,7 @@ export interface SimulatedTrade {
   shares: number;
   pricePerShare: number;
   /** Account the trade executes in — required for sells (determines which
-   *  lots are sold), informational for buys. */
+   *  lots are sold), also used on buys to detect the IRA-permanent case. */
   accountId?: number;
 }
 
@@ -17,6 +17,8 @@ export interface WashSaleTrigger {
   date: string;
   accountName: string;
   description: string;
+  /** Whether this specific triggering account is an IRA. */
+  isIra: boolean;
 }
 
 export interface WashSaleWarning {
@@ -26,6 +28,18 @@ export interface WashSaleWarning {
   /** First date the trade could execute without wash-sale risk. */
   windowClearsOn: string;
   message: string;
+  /**
+   * Rev. Rul. 2008-5: when the replacement shares sit in an IRA, the loss is
+   * permanently disallowed rather than deferred into a new cost basis — a
+   * materially worse outcome than a same-taxable-account wash sale.
+   */
+  isIraPermanent: boolean;
+}
+
+function isIraAccount(accounts: Account[], accountId: number | undefined): boolean {
+  if (accountId == null) return false;
+  const account = accounts.find((a) => a.id === accountId);
+  return account?.type === "roth" || account?.type === "traditional_ira";
 }
 
 /** FIFO preview of a sell: which shares would go, and at what average basis. */
@@ -84,11 +98,16 @@ export function previewFifoSell(
  *
  * Binary check by design: any match flags, regardless of share counts. The
  * real rule disallows the loss proportionally to replacement shares.
+ *
+ * Whichever side supplies the replacement shares, if that account is an IRA
+ * the loss is permanently disallowed (Rev. Rul. 2008-5) rather than deferred
+ * into a new cost basis — flagged via `isIraPermanent`.
  */
 export function checkWashSale(
   trade: SimulatedTrade,
   sales: Sale[],
   lots: Lot[],
+  accounts: Account[],
   today: string
 ): WashSaleWarning | null {
   const ticker = trade.ticker.toUpperCase();
@@ -103,10 +122,13 @@ export function checkWashSale(
     );
     if (lossSales.length === 0) return null;
 
+    // The replacement shares are this buy itself — its account is what matters.
+    const isIraPermanent = isIraAccount(accounts, trade.accountId);
     const triggers = lossSales.map((s) => ({
       date: s.saleDate,
       accountName: s.accountName,
       description: `Sold ${s.shares} ${ticker} at a $${Math.abs(s.realizedGainLoss).toFixed(2)} loss in ${s.accountName}`,
+      isIra: isIraAccount(accounts, s.accountId),
     }));
     const latestSaleDate = lossSales
       .map((s) => s.saleDate)
@@ -118,7 +140,10 @@ export function checkWashSale(
       ticker,
       triggers,
       windowClearsOn,
-      message: `Buying ${ticker} now would trigger a wash sale — the loss from your ${latestSaleDate} sale would be disallowed. The window clears on ${windowClearsOn}.`,
+      isIraPermanent,
+      message: isIraPermanent
+        ? `Buying ${ticker} now would trigger a wash sale — and because the repurchase is in an IRA, the loss from your ${latestSaleDate} sale is PERMANENTLY disallowed (it can never be added back to cost basis, per Rev. Rul. 2008-5). The window clears on ${windowClearsOn}.`
+        : `Buying ${ticker} now would trigger a wash sale — the loss from your ${latestSaleDate} sale would be disallowed and rolled into the cost basis of these new shares. The window clears on ${windowClearsOn}.`,
     };
   }
 
@@ -147,7 +172,10 @@ export function checkWashSale(
     date: l.purchaseDate,
     accountName: l.accountName,
     description: `Bought ${l.shares} ${ticker} in ${l.accountName}`,
+    isIra: isIraAccount(accounts, l.accountId),
   }));
+  // The replacement shares are these recent buys — permanent if any sit in an IRA.
+  const isIraPermanent = triggers.some((t) => t.isIra);
   const latestBuyDate = recentBuys
     .map((l) => l.purchaseDate)
     .sort()
@@ -158,6 +186,9 @@ export function checkWashSale(
     ticker,
     triggers,
     windowClearsOn,
-    message: `Selling ${ticker} at a loss now would trigger a wash sale — you bought shares on ${latestBuyDate} that you'd still hold. The window clears on ${windowClearsOn}.`,
+    isIraPermanent,
+    message: isIraPermanent
+      ? `Selling ${ticker} at a loss now would trigger a wash sale — you bought shares on ${latestBuyDate} in an IRA that you'd still hold, so the loss is PERMANENTLY disallowed (per Rev. Rul. 2008-5), not just deferred. The window clears on ${windowClearsOn}.`
+      : `Selling ${ticker} at a loss now would trigger a wash sale — you bought shares on ${latestBuyDate} that you'd still hold, so the loss would be disallowed and added to those shares' cost basis. The window clears on ${windowClearsOn}.`,
   };
 }

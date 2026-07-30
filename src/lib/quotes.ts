@@ -1,4 +1,4 @@
-import { getDb } from "@/lib/db";
+import { createClient } from "@/lib/supabase/server";
 
 export interface Quote {
   ticker: string;
@@ -6,20 +6,16 @@ export interface Quote {
   fetchedAt: string;
 }
 
-export function getStoredQuotes(tickers: string[]): Map<string, Quote> {
+export async function getStoredQuotes(tickers: string[]): Promise<Map<string, Quote>> {
   if (tickers.length === 0) return new Map();
-  const placeholders = tickers.map(() => "?").join(",");
-  const rows = getDb()
-    .prepare(
-      `SELECT ticker, price, fetched_at FROM quotes WHERE ticker IN (${placeholders})`
-    )
-    .all(...tickers.map((t) => t.toUpperCase())) as unknown as {
-    ticker: string;
-    price: number;
-    fetched_at: string;
-  }[];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("quotes")
+    .select("ticker, price, fetched_at")
+    .in("ticker", tickers.map((t) => t.toUpperCase()));
+  if (error) throw new Error(error.message);
   return new Map(
-    rows.map((r) => [
+    (data ?? []).map((r) => [
       r.ticker,
       { ticker: r.ticker, price: r.price, fetchedAt: r.fetched_at },
     ])
@@ -55,8 +51,8 @@ async function fetchQuote(ticker: string): Promise<number | null> {
   }
 }
 
-/** Fetch current prices for the given tickers and upsert into the quotes
- *  table. Failures leave any previously stored quote untouched. */
+/** Fetch current prices for the given tickers and upsert into the shared
+ *  quotes cache. Failures leave any previously stored quote untouched. */
 export async function refreshQuotes(
   tickers: string[]
 ): Promise<{ updated: string[]; failed: string[] }> {
@@ -64,24 +60,26 @@ export async function refreshQuotes(
   const updated: string[] = [];
   const failed: string[] = [];
   const now = new Date().toISOString();
-  const upsert = getDb().prepare(
-    `INSERT INTO quotes (ticker, price, fetched_at) VALUES (?, ?, ?)
-     ON CONFLICT(ticker) DO UPDATE SET price = excluded.price, fetched_at = excluded.fetched_at`
-  );
+  const supabase = await createClient();
 
   const BATCH = 5;
   for (let i = 0; i < unique.length; i += BATCH) {
     const batch = unique.slice(i, i + BATCH);
     const prices = await Promise.all(batch.map(fetchQuote));
+    const rows: { ticker: string; price: number; fetched_at: string }[] = [];
     batch.forEach((ticker, j) => {
       const price = prices[j];
       if (price === null) {
         failed.push(ticker);
       } else {
-        upsert.run(ticker, price, now);
+        rows.push({ ticker, price, fetched_at: now });
         updated.push(ticker);
       }
     });
+    if (rows.length > 0) {
+      const { error } = await supabase.from("quotes").upsert(rows);
+      if (error) throw new Error(error.message);
+    }
   }
   return { updated, failed };
 }

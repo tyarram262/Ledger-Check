@@ -1,13 +1,12 @@
 import { createHash } from "node:crypto";
-import { getDb } from "@/lib/db";
-import { listLots } from "@/lib/queries";
+import Anthropic from "@anthropic-ai/sdk";
+import { createClient } from "@/lib/supabase/server";
+import { getConcentrationThreshold, listLots } from "@/lib/queries";
 import { concentrationVerdict, sectorAllocation } from "@/lib/concentration";
 import { lookupSecurity } from "@/lib/sectors";
 import { getStoredQuotes, toPriceMap } from "@/lib/quotes";
 import { buildPositions } from "@/lib/valuation";
 import type { Lot } from "@/lib/types";
-
-const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
 
 export interface Digest {
   content: string;
@@ -24,27 +23,28 @@ function portfolioHash(lots: Lot[]): string {
   return createHash("sha256").update(canonical).digest("hex");
 }
 
-export function getCachedDigest(): Digest | null {
-  const row = getDb()
-    .prepare("SELECT content, portfolio_hash, created_at FROM digest_cache WHERE id = 1")
-    .get() as
-    | { content: string; portfolio_hash: string; created_at: string }
-    | undefined;
+export async function getCachedDigest(): Promise<Digest | null> {
+  const supabase = await createClient();
+  const { data: row, error } = await supabase
+    .from("digest_cache")
+    .select("content, portfolio_hash, created_at")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
   if (!row) return null;
   return {
     content: row.content,
     createdAt: row.created_at,
-    stale: row.portfolio_hash !== portfolioHash(listLots()),
+    stale: row.portfolio_hash !== portfolioHash(await listLots()),
   };
 }
 
-function buildPrompt(lots: Lot[]): string {
+async function buildPrompt(lots: Lot[]): Promise<string> {
   const prices = toPriceMap(
-    getStoredQuotes([...new Set(lots.map((l) => l.ticker))])
+    await getStoredQuotes([...new Set(lots.map((l) => l.ticker))])
   );
   const positions = buildPositions(lots, prices);
   const slices = sectorAllocation(positions);
-  const verdict = concentrationVerdict(slices);
+  const verdict = concentrationVerdict(slices, await getConcentrationThreshold());
   const holdings = lots.map((l) => {
     const info = lookupSecurity(l.ticker);
     return {
@@ -83,17 +83,17 @@ Write a 3-4 sentence summary of this portfolio's single biggest risk. Rules:
 export async function generateDigest(): Promise<
   { ok: true; digest: Digest } | { ok: false; error: string; status: number }
 > {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.CLAUDE_API_KEY;
   if (!apiKey) {
     return {
       ok: false,
       status: 503,
       error:
-        "GEMINI_API_KEY isn't set. Add it to .env.local and restart the dev server.",
+        "CLAUDE_API_KEY isn't set. Add it to .env.local and restart the dev server.",
     };
   }
 
-  const lots = listLots();
+  const lots = await listLots();
   if (lots.length === 0) {
     return {
       ok: false,
@@ -102,50 +102,53 @@ export async function generateDigest(): Promise<
     };
   }
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: buildPrompt(lots) }] }],
-      }),
-    }
-  );
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
+  const prompt = await buildPrompt(lots);
+  const anthropic = new Anthropic({ apiKey });
+  let response;
+  try {
+    response = await anthropic.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 1024,
+      messages: [{ role: "user", content: prompt }],
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     return {
       ok: false,
       status: 502,
-      error: `Gemini API error (${res.status}): ${detail.slice(0, 300)}`,
+      error: `Claude API error: ${message.slice(0, 300)}`,
     };
   }
 
-  const data = await res.json();
-  const content: string | undefined =
-    data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (response.stop_reason === "refusal") {
+    return {
+      ok: false,
+      status: 502,
+      error: "Claude declined to generate a digest for this portfolio — try again.",
+    };
+  }
+
+  const textBlock = response.content.find((b) => b.type === "text");
+  const content = textBlock?.text;
   if (!content) {
     return {
       ok: false,
       status: 502,
-      error: "Gemini returned an empty response — try again.",
+      error: "Claude returned an empty response — try again.",
     };
   }
 
   const createdAt = new Date().toISOString();
-  getDb()
-    .prepare(
-      `INSERT INTO digest_cache (id, content, portfolio_hash, created_at)
-       VALUES (1, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET
-         content = excluded.content,
-         portfolio_hash = excluded.portfolio_hash,
-         created_at = excluded.created_at`
-    )
-    .run(content.trim(), portfolioHash(lots), createdAt);
+  const supabase = await createClient();
+  const { error: upsertError } = await supabase.from("digest_cache").upsert(
+    {
+      content: content.trim(),
+      portfolio_hash: portfolioHash(lots),
+      created_at: createdAt,
+    },
+    { onConflict: "user_id" }
+  );
+  if (upsertError) throw new Error(upsertError.message);
 
   return {
     ok: true,

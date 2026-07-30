@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { generateDigest, getCachedDigest } from "@/lib/digest";
 
 export async function GET() {
-  return NextResponse.json({ digest: getCachedDigest() });
+  return NextResponse.json({ digest: await getCachedDigest() });
 }
 
 export async function POST() {

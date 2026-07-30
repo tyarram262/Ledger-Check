@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listLots } from "@/lib/queries";
+import { getConcentrationThreshold, listLots } from "@/lib/queries";
 import {
   concentrationVerdict,
   sectorAllocation,
@@ -21,9 +21,9 @@ const LEVEL_STYLES: Record<ConcentrationLevel, string> = {
   high: "border-red-200 bg-red-50 text-red-800",
 };
 
-export default function DashboardPage() {
-  const lots = listLots();
-  const quotes = getStoredQuotes([...new Set(lots.map((l) => l.ticker))]);
+export default async function DashboardPage() {
+  const lots = await listLots();
+  const quotes = await getStoredQuotes([...new Set(lots.map((l) => l.ticker))]);
   const prices = toPriceMap(quotes);
   const positions = buildPositions(lots, prices);
   const { priced, unpriced } = splitPricedTickers(lots, prices);
@@ -31,7 +31,7 @@ export default function DashboardPage() {
     .map((q) => q.fetchedAt)
     .sort()[0];
   const slices = sectorAllocation(positions);
-  const verdict = concentrationVerdict(slices);
+  const verdict = concentrationVerdict(slices, await getConcentrationThreshold());
   const totalValue = positions.reduce((sum, p) => sum + p.value, 0);
   const hasEtf = lots.some((l) => lookupSecurity(l.ticker)?.isEtf);
   const hasUnmapped = lots.some((l) => !lookupSecurity(l.ticker));

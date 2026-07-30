@@ -4,7 +4,7 @@ import { createLot, listAccounts, listLots } from "@/lib/queries";
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET() {
-  return NextResponse.json(listLots());
+  return NextResponse.json(await listLots());
 }
 
 export async function POST(request: Request) {
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const purchaseDate = body?.purchaseDate;
 
   const errors: string[] = [];
-  if (!listAccounts().some((a) => a.id === accountId))
+  if (!(await listAccounts()).some((a) => a.id === accountId))
     errors.push("Unknown account.");
   if (!/^[A-Za-z.\-]{1,10}$/.test(ticker)) errors.push("Invalid ticker.");
   if (!Number.isFinite(shares) || shares <= 0)
@@ -30,6 +30,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errors.join(" ") }, { status: 400 });
   }
 
-  const id = createLot({ accountId, ticker, shares, costPerShare, purchaseDate });
+  const id = await createLot({ accountId, ticker, shares, costPerShare, purchaseDate });
   return NextResponse.json({ id }, { status: 201 });
 }

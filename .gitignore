@@ -40,5 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local SQLite database
-/data/
+# Claude Code local tooling (personal, not shared)
+.claude/settings.local.json
+.claude/skills/
+.agents/skills/
+skills-lock.json

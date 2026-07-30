@@ -3,7 +3,7 @@ import { listLots } from "@/lib/queries";
 import { refreshQuotes } from "@/lib/quotes";
 
 export async function POST() {
-  const tickers = [...new Set(listLots().map((l) => l.ticker))];
+  const tickers = [...new Set((await listLots()).map((l) => l.ticker))];
   if (tickers.length === 0) {
     return NextResponse.json({ updated: [], failed: [] });
   }

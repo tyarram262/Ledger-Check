@@ -4,9 +4,9 @@ import TradeSimulator from "@/components/TradeSimulator";
 
 export const dynamic = "force-dynamic";
 
-export default function SimulatePage() {
-  const accounts = listAccounts();
-  const hasHoldings = listLots().length > 0;
+export default async function SimulatePage() {
+  const accounts = await listAccounts();
+  const hasHoldings = (await listLots()).length > 0;
 
   return (
     <div className="space-y-6">

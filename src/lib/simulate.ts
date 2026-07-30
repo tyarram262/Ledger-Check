@@ -1,7 +1,8 @@
-import type { Lot, Sale } from "@/lib/types";
+import type { Account, Lot, Sale } from "@/lib/types";
 import {
   concentrationVerdict,
   sectorAllocation,
+  DEFAULT_ELEVATED_THRESHOLD,
   type ConcentrationVerdict,
   type SectorSlice,
 } from "@/lib/concentration";
@@ -50,8 +51,10 @@ export function simulateTrade(
   trade: SimulatedTrade,
   lots: Lot[],
   sales: Sale[],
+  accounts: Account[],
   today: string,
-  prices: Map<string, number> = new Map()
+  prices: Map<string, number> = new Map(),
+  elevatedThreshold: number = DEFAULT_ELEVATED_THRESHOLD
 ): SimulationOutcome {
   const ticker = trade.ticker.toUpperCase();
   const sector = sectorFor(ticker);
@@ -94,14 +97,14 @@ export function simulateTrade(
 
   const before: AllocationSnapshot = (() => {
     const slices = sectorAllocation(beforePositions);
-    return { slices, verdict: concentrationVerdict(slices) };
+    return { slices, verdict: concentrationVerdict(slices, elevatedThreshold) };
   })();
   const after: AllocationSnapshot = (() => {
     const slices = sectorAllocation(afterPositions);
-    return { slices, verdict: concentrationVerdict(slices) };
+    return { slices, verdict: concentrationVerdict(slices, elevatedThreshold) };
   })();
 
-  const washSale = checkWashSale(trade, sales, lots, today);
+  const washSale = checkWashSale(trade, sales, lots, accounts, today);
 
   // One-sentence verdict: concentration move + wash-sale outcome.
   const beforePct = pctOf(before.slices, sector);
@@ -120,10 +123,14 @@ export function simulateTrade(
   let washClause: string;
   if (washSale?.kind === "buy-after-loss") {
     const t = washSale.triggers.at(-1)!;
-    washClause = ` and would trigger a wash sale — the loss from your ${t.date} ${ticker} sale in ${t.accountName} would be disallowed`;
+    washClause = washSale.isIraPermanent
+      ? ` and would trigger a wash sale — because the repurchase is in an IRA, the loss from your ${t.date} ${ticker} sale in ${t.accountName} would be PERMANENTLY disallowed`
+      : ` and would trigger a wash sale — the loss from your ${t.date} ${ticker} sale in ${t.accountName} would be disallowed`;
   } else if (washSale?.kind === "sell-with-recent-buy") {
     const t = washSale.triggers.at(-1)!;
-    washClause = ` and would trigger a wash sale — you bought ${ticker} on ${t.date} (${t.accountName}), so this loss would be disallowed`;
+    washClause = washSale.isIraPermanent
+      ? ` and would trigger a wash sale — you bought ${ticker} on ${t.date} in an IRA (${t.accountName}), so this loss would be PERMANENTLY disallowed`
+      : ` and would trigger a wash sale — you bought ${ticker} on ${t.date} (${t.accountName}), so this loss would be disallowed`;
   } else {
     washClause = " and doesn't trigger a wash sale";
   }

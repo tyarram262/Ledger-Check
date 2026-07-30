@@ -189,23 +189,46 @@ export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
           </div>
 
           {result.washSale && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-5">
+            <div
+              className={
+                result.washSale.isIraPermanent
+                  ? "rounded-lg border-2 border-red-400 bg-red-100 p-5"
+                  : "rounded-lg border border-red-200 bg-red-50 p-5"
+              }
+            >
               <h3 className="font-semibold text-red-800">
-                Wash-sale warning
+                {result.washSale.isIraPermanent
+                  ? "⚠️ Wash sale — loss permanently disallowed (IRA)"
+                  : "Wash-sale warning"}
               </h3>
               <ul className="mt-2 list-disc pl-5 text-sm text-red-700">
                 {result.washSale.triggers.map((t) => (
                   <li key={`${t.date}-${t.accountName}`}>
                     {t.date}: {t.description}
+                    {t.isIra && (
+                      <span className="ml-1.5 rounded bg-red-200 px-1.5 py-0.5 text-xs font-medium text-red-800">
+                        IRA
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
-              <p className="mt-2 text-sm text-red-700">
-                The 30-day window clears on{" "}
-                <strong>{result.washSale.windowClearsOn}</strong>. The IRS may
-                disallow some or all of the loss depending on share counts —
-                this check flags any match.
-              </p>
+              <p className="mt-2 text-sm text-red-700">{result.washSale.message}</p>
+              {result.washSale.isIraPermanent ? (
+                <p className="mt-2 text-xs text-red-600">
+                  This is worse than a same-taxable-account wash sale: because
+                  the replacement shares sit in an IRA, the loss can never be
+                  recovered by adding it to a future cost basis — it&apos;s
+                  gone for good (Rev. Rul. 2008-5). This check is binary — any
+                  ticker match flags, regardless of share counts.
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-red-600">
+                  This check is binary — any ticker match flags, regardless of
+                  share counts. The IRS disallows the loss proportionally to
+                  replacement shares.
+                </p>
+              )}
             </div>
           )}
 

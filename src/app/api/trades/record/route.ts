@@ -18,13 +18,13 @@ export async function POST(request: Request) {
     errors.push("Shares must be a positive number.");
   if (!Number.isFinite(pricePerShare) || pricePerShare <= 0)
     errors.push("Price must be a positive number.");
-  if (!listAccounts().some((a) => a.id === accountId))
+  if (!(await listAccounts()).some((a) => a.id === accountId))
     errors.push("Unknown account.");
   if (errors.length > 0) {
     return NextResponse.json({ error: errors.join(" ") }, { status: 400 });
   }
 
-  const outcome = recordTrade(
+  const outcome = await recordTrade(
     { side, ticker, shares, pricePerShare, accountId },
     todayIso()
   );

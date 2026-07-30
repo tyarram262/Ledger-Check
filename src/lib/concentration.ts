@@ -21,8 +21,11 @@ export interface ConcentrationVerdict {
   sentence: string;
 }
 
-export const ELEVATED_THRESHOLD = 25;
-export const HIGH_THRESHOLD = 40;
+export const DEFAULT_ELEVATED_THRESHOLD = 25;
+// "High" concentration kicks in well past "elevated" — scaled off the
+// user's configurable threshold so the two tiers stay proportional
+// (the shipped default of 25/40 is a 1.6x ratio).
+const HIGH_THRESHOLD_MULTIPLIER = 1.6;
 
 export function sectorAllocation(positions: Position[]): SectorSlice[] {
   // Accumulate before filtering: sells are modeled as negative adjustments
@@ -41,8 +44,11 @@ export function sectorAllocation(positions: Position[]): SectorSlice[] {
 }
 
 export function concentrationVerdict(
-  slices: SectorSlice[]
+  slices: SectorSlice[],
+  elevatedThreshold: number = DEFAULT_ELEVATED_THRESHOLD
 ): ConcentrationVerdict {
+  const highThreshold = elevatedThreshold * HIGH_THRESHOLD_MULTIPLIER;
+
   // Judge concentration only on single-sector bets; owning 100% VTI is not
   // "100% concentrated in Diversified".
   const sectorBets = slices.filter(
@@ -63,7 +69,7 @@ export function concentrationVerdict(
   const top = sectorBets[0];
   const pctText = `${Math.round(top.pct)}% of your portfolio is in ${top.sector}`;
 
-  if (top.pct > HIGH_THRESHOLD) {
+  if (top.pct > highThreshold) {
     return {
       level: "high",
       topSector: top.sector,
@@ -71,7 +77,7 @@ export function concentrationVerdict(
       sentence: `${pctText} — that's high concentration.`,
     };
   }
-  if (top.pct > ELEVATED_THRESHOLD) {
+  if (top.pct > elevatedThreshold) {
     return {
       level: "elevated",
       topSector: top.sector,

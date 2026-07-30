@@ -5,7 +5,7 @@ import type { AccountType } from "@/lib/types";
 const ACCOUNT_TYPES: AccountType[] = ["taxable", "roth", "traditional_ira"];
 
 export async function GET() {
-  return NextResponse.json(listAccounts());
+  return NextResponse.json(await listAccounts());
 }
 
 export async function POST(request: Request) {
@@ -19,5 +19,5 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  return NextResponse.json(createAccount(name, type), { status: 201 });
+  return NextResponse.json(await createAccount(name, type), { status: 201 });
 }

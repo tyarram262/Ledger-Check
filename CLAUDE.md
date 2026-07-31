@@ -72,6 +72,13 @@ checked into the repo. To inspect it, query live
   still had the default `{{ .ConfirmationURL }}`, which was the actual cause
   of a "Safari can't connect" / `otp_expired` failure on first sign-in.
   **Verify both templates are fixed before assuming auth works.**
+- **Correction (2026-07-31, per user checking the dashboard directly):**
+  editing a template's HTML source is gated behind having **custom SMTP
+  configured** — Supabase won't let you touch "Confirm signup"'s source
+  while still on the built-in sender. This is why the earlier plan to "just
+  edit the template" doesn't work as stated; custom SMTP has to go back on
+  first, correctly configured this time (the prior attempt had Host set to
+  `http://localhost:3000`, which is invalid — see below).
 - Supabase Dashboard → Authentication → URL Configuration → Additional
   Redirect URLs needs both `http://localhost:3000/auth/confirm` and
   `https://ledger-check-henna.vercel.app/auth/confirm`.
@@ -79,7 +86,9 @@ checked into the repo. To inspect it, query live
   emails/hour) — expect to hit this during manual testing. A prior custom
   SMTP misconfiguration (Host field set to `http://localhost:3000`, invalid)
   was found and fixed by disabling custom SMTP / falling back to the
-  built-in sender.
+  built-in sender. Re-enabling custom SMTP (now required to fix the
+  template, see above) means picking a real SMTP provider and getting the
+  Host/Port/Username/Password right this time.
 - No MCP tool covers Auth/SMTP/email-template config — those are
   dashboard-only changes only the user can make.
 
@@ -141,11 +150,12 @@ checked into the repo. To inspect it, query live
 ## The 4-phase roadmap to production readiness
 
 1. **Make it hostable at all** (multi-user auth + hosted DB + deploy) —
-   **Closed**, modulo one manual step only doable from the Supabase
-   dashboard: the "Confirm signup" email template (see below). Everything
-   else — auth, RLS, every API route, the wash-sale/concentration engines
-   against real data, the Claude digest — is verified end to end as of
-   2026-07-31.
+   **Closed for the existing account.** Auth, RLS, every API route, the
+   wash-sale/concentration engines against real data, and the Claude digest
+   are all verified end to end as of 2026-07-31. **Still open for brand-new
+   signups:** the "Confirm signup" email template (see below) — fixing it
+   requires custom SMTP to be configured first, which is dashboard-only and
+   needs a provider decision from the user.
 2. **Cut onboarding friction** — SnapTrade brokerage sync so holdings and
    transactions import automatically instead of manual entry/CSV. Not
    started.
@@ -160,11 +170,19 @@ checked into the repo. To inspect it, query live
 
 1. **Authentication → Email Templates → "Confirm signup"** is still on the
    default `{{ .ConfirmationURL }}` (implicit flow, drops the token in a URL
-   fragment the server never sees). Change its link to
-   `<a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">`,
-   matching the already-fixed "Magic Link" template. This only affects
-   *brand-new* signups — the existing user account is past it, which is why
-   the automated run above couldn't catch it.
+   fragment the server never sees). It needs the same fix already applied to
+   "Magic Link":
+   `<a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">`.
+   **Blocked on a prerequisite:** per the user (2026-07-31), Supabase won't
+   let you edit a template's source while running on the built-in email
+   sender — custom SMTP has to be configured first. Requires: (a) picking an
+   SMTP provider and creating an account with it, (b) entering its
+   Host/Port/Username/Password into Authentication → Sign In / Providers →
+   SMTP Settings correctly (the prior attempt had Host set to
+   `http://localhost:3000`, which is invalid — don't repeat that), (c) then
+   editing the template. This only affects *brand-new* signups — the
+   existing user account is past it, which is why the automated verification
+   run above couldn't catch it.
 2. **Authentication → URL Configuration → Additional Redirect URLs** —
    confirm both `http://localhost:3000/auth/confirm` and
    `https://ledger-check-henna.vercel.app/auth/confirm` are listed.

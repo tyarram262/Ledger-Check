@@ -1,5 +1,5 @@
 @AGENTS.md
-# Session handoff — READ THIS FIRST (updated 2026-07-30)
+# Session handoff — READ THIS FIRST (updated 2026-07-31)
 
 The build prompt below this section is the **original spec**. Its domain-logic
 sections (wash-sale rules, sector concentration) are still authoritative. Its
@@ -53,7 +53,7 @@ checked into the repo. To inspect it, query live
   introduce the service-role key unless a genuine admin-only operation
   requires it.
 
-## Auth flow — known rough edges
+## Auth flow — current state (working end to end as of 2026-07-31)
 
 - `src/proxy.ts` + `src/lib/supabase/proxy.ts` (`updateSession`) gate every
   route except `/login` and `/auth/*`.
@@ -61,45 +61,32 @@ checked into the repo. To inspect it, query live
   header so one Supabase project serves both `localhost:3000` and the
   production domain — Supabase only has one `Site URL` setting, so a
   hardcoded `{{ .SiteURL }}` in the email template would break whichever
-  environment isn't primary.
-- **Two separate email templates matter, not one.** `signInWithOtp` sends
-  Supabase's **"Confirm signup"** template for a brand-new email address and
-  **"Magic Link"** for returning users. Both need their link changed to:
+  environment isn't primary. It also falls back to a friendly message when
+  `signInWithOtp`'s error has an unreadable `.message` (Supabase can return
+  the literal string `"{}"` when the SMTP provider rejects a send).
+- **Two email templates matter, not one** — `signInWithOtp` sends Supabase's
+  **"Confirm signup"** template for a brand-new address and **"Magic Link"**
+  for returning users. Both are fixed to PKCE-style links:
   ```html
   <a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">...</a>
   ```
-  As of 2026-07-30, **only "Magic Link" had been fixed** — "Confirm signup"
-  still had the default `{{ .ConfirmationURL }}`, which was the actual cause
-  of a "Safari can't connect" / `otp_expired` failure on first sign-in.
-  **Verify both templates are fixed before assuming auth works.**
-- **Resolved (2026-07-31).** Editing a template's HTML source turned out to
-  be gated behind having **custom SMTP configured** — the built-in sender
-  doesn't allow it. Custom SMTP is now live via **Resend**
-  (`smtp.resend.com:465`, username `resend`, password = API key, min TLS
-  1.2), and "Confirm signup" has the `{{ .RedirectTo }}?token_hash=...`
-  fix applied. **Verified with a real signup + real inbox click** (not just
-  the MCP-token bypass) — `tanush.yarram@gmail.com` received the actual
-  email, clicked it, and landed authenticated in the app.
-- **New known limitation: Resend sandbox mode.** Without a verified domain,
-  Resend's `onboarding@resend.dev` sender can only deliver to the *exact*
-  email the Resend account was created with — currently
-  `tanush.yarram@gmail.com`. Every other address, including the original
-  `tanush.yarram@icloud.com` account (which holds an earlier, separate copy
-  of the demo dataset — see below), gets a hard `550` rejection, not a soft
-  failure. **`tanush.yarram@gmail.com` is now the primary account to sign in
-  with** until a domain is verified on Resend. Verifying a domain is also
-  the real prerequisite for Phase 4 (letting other people sign up), so it's
-  worth doing together whenever that's picked up rather than twice.
+  Editing a template's source requires custom SMTP to be configured first —
+  the built-in sender won't let you touch it. Verified with a real signup,
+  a real inbox, and a real clicked link, not just curl.
+- **Custom SMTP is live via Resend** (`smtp.resend.com:465`, username
+  `resend`, password = the Resend API key, min TLS 1.2, sender
+  `onboarding@resend.dev`). This also raised the auth email rate limit from
+  2/hour to 30/hour.
+- **Known limitation: Resend sandbox mode.** Without a verified domain,
+  `onboarding@resend.dev` can only deliver to the *exact* email the Resend
+  account was created with — `tanush.yarram@gmail.com`. Every other
+  address gets a hard `550` rejection (not a soft failure), including the
+  original `tanush.yarram@icloud.com` account. **Sign in with
+  `tanush.yarram@gmail.com`** until a domain is verified on Resend — see
+  "One dashboard item left" below.
 - Supabase Dashboard → Authentication → URL Configuration → Additional
   Redirect URLs needs both `http://localhost:3000/auth/confirm` and
   `https://ledger-check-henna.vercel.app/auth/confirm`.
-- Custom SMTP raised the auth email rate limit from 2/hour to 30/hour
-  (confirmed in Supabase auth logs).
-- `login/actions.ts` falls back to a friendly message when
-  `signInWithOtp`'s error has an unreadable `message` (observed: the literal
-  string `"{}"` from an `AuthRetryableFetchError` when Resend rejects a
-  send) — added 2026-07-31 after hitting this live via the icloud.com
-  sandbox rejection above.
 - No MCP tool covers Auth/SMTP/email-template config — those are
   dashboard-only changes only the user can make.
 
@@ -117,64 +104,41 @@ checked into the repo. To inspect it, query live
 
 ## Verified vs. not yet verified (as of 2026-07-31)
 
-- **Verified — including the full authenticated click-through that was the
-  last open item.** The magic-link rate limit / broken "Confirm signup"
-  template blocked testing via a real inbox, so the click-through was done
-  by reading the PKCE token straight out of `auth.one_time_tokens` via the
-  Supabase MCP connection (that column holds exactly the value
-  `{{ .TokenHash }}` interpolates into the email) and completing the real
-  `/auth/confirm?token_hash=...&type=email` request with `curl` — same
-  route, same `verifyOtp` call, same cookie plumbing a browser would use.
-  `auth.users.last_sign_in_at`, previously `null`, is now set, which is the
-  clearest proof the flow works end to end. Confirmed `type=email` is the
-  correct OTP type for this route (matches what the already-fixed "Magic
-  Link" template sends).
-  - Every API route exercised with a real authenticated session: account
-    CRUD, lot CRUD (incl. delete), CSV import (incl. malformed-row
-    handling), `record_sell` RPC (real FIFO consumption across two trades,
-    not just unit-tested), settings GET/POST round-trip, Yahoo quote
-    refresh, digest GET/POST (real Claude call + cache), sale delete, and
-    proxy redirect behavior both directions (unauth → `/login`,
-    post-signout → `/login`).
-  - Wash-sale engine verified against real DB-backed data (not just unit
-    tests): a sell-side IRA-permanent case, a sell-side deferred
-    cross-account case, a sell-side case correctly *not* flagged (buy
-    outside the 61-day window), and both IRA/non-IRA flavors of the buy-side
-    "buy-after-loss" case.
-  - `tsc`/`eslint`/50 unit tests still clean after the run; Supabase
-    security+performance advisors re-checked — only pre-existing, by-design
-    items (the intentionally-unrestricted `quotes` INSERT/UPDATE policy;
-    leaked-password-protection, which is moot since this app has no
-    passwords) plus informational unused-index notices from having just
-    started real traffic.
-  - A demo dataset was seeded through the app's own API (not raw SQL) as
-    part of this verification and left in place: 4 accounts (2 taxable, 1
-    Roth, 1 traditional IRA), holdings weighted so Information Technology
-    sits ~56–65% of the portfolio (trips the concentration flag both before
-    and after the demo trades), and 3 recorded sales realizing the wash-sale
-    scenarios above.
-- **Also verified (2026-07-31, later same session):** a real emailed
-  "Confirm signup" link, clicked in an actual browser — the one thing the
-  MCP-token approach structurally couldn't confirm on its own, since it
-  bypasses the template's rendered HTML entirely. Custom SMTP (Resend) is
-  live and the template fix is real, not just theoretically applied. See
-  the Resend sandbox-mode limitation above for the one new constraint this
-  surfaced. **Nothing about the original auth flow remains unverified.**
-  - The demo dataset was recreated under `tanush.yarram@gmail.com` (now the
-    account to actually sign in with, per the sandbox limitation above) —
-    same shape as the original: 4 accounts, holdings tripping the
-    concentration threshold, the 3 wash-sale sells recorded. The original
-    copy under `tanush.yarram@icloud.com` still exists but that account is
-    currently unreachable by email.
+**Verified end to end — nothing about auth or the core flows remains
+unproven.** A full authenticated pass was made against the live Supabase
+project: `auth.users.last_sign_in_at` is set for both accounts, and a real
+"Confirm signup" email was clicked in a real browser (Resend is live, the
+template fix is real, not just theoretical). Every API route was exercised
+with a real session — account/lot CRUD (incl. delete), CSV import (incl.
+malformed-row handling), the `record_sell` FIFO RPC (real consumption, not
+just unit-tested), settings GET/POST, Yahoo quote refresh, digest GET/POST
+(real Claude call + cache), and proxy redirects both directions. The
+wash-sale engine was verified against real DB-backed data: sell-side
+IRA-permanent, sell-side deferred cross-account, a case correctly *not*
+flagged (outside the 61-day window), and both IRA/non-IRA flavors of
+buy-after-loss. `tsc`/`eslint`/50 unit tests are clean; Supabase
+security+performance advisors show only pre-existing, by-design items (the
+intentionally-unrestricted `quotes` policy; moot leaked-password-protection
+since there are no passwords).
+
+**Demo data exists in two places** (both seeded through the app's own API,
+not raw SQL — same shape: 4 accounts spanning taxable/Roth/traditional-IRA,
+holdings weighted so Information Technology trips the concentration
+threshold, 3 recorded sales realizing IRA-permanent + deferred + JNJ
+buy-after-loss wash-sale scenarios):
+- Under `tanush.yarram@gmail.com` — **the account to actually use**, since
+  it's the only one Resend's sandbox mode can currently email.
+- Under `tanush.yarram@icloud.com` — the original copy; still in the DB but
+  that account is unreachable by email until a domain is verified on
+  Resend (see below).
 
 ## The 4-phase roadmap to production readiness
 
 1. **Make it hostable at all** (multi-user auth + hosted DB + deploy) —
-   **Fully closed, 2026-07-31.** Auth (including a real "Confirm signup"
-   email click-through, not just the MCP-token bypass), RLS, every API
-   route, the wash-sale/concentration engines against real data, and the
-   Claude digest are all verified end to end. One caveat carried forward,
-   not a Phase 1 gap: Resend sandbox mode limits which address can
+   **Fully closed, 2026-07-31.** Auth, RLS, every API route, the
+   wash-sale/concentration engines against real data, and the Claude digest
+   are all verified end to end — see "Verified" above. One caveat carried
+   forward, not a Phase 1 gap: Resend sandbox mode limits which address can
    currently receive auth emails (see "Auth flow" above) — solvable by
    verifying a domain whenever that's convenient, and worth bundling with
    Phase 4 since that phase needs it too.
@@ -195,8 +159,7 @@ Sender email off `onboarding@resend.dev` to an address on that domain. Not
 blocking anything today (single-user use works fine on
 `tanush.yarram@gmail.com`), but required before other people can sign up —
 Resend's sandbox mode hard-rejects any recipient besides the account's own
-verified email. See "Auth flow — known rough edges" above for the full
-story.
+verified email. See "Auth flow" above for the full story.
 
 ---
 

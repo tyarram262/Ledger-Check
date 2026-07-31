@@ -1,4 +1,176 @@
 @AGENTS.md
+# Session handoff — READ THIS FIRST (updated 2026-07-30)
+
+The build prompt below this section is the **original spec**. Its domain-logic
+sections (wash-sale rules, sector concentration) are still authoritative. Its
+**tech stack, data model, and API endpoint sections are stale** — the user
+confirmed early on to keep the stack that actually got built and fill gaps
+against the spec, rather than rewrite to match it. Read this section before
+touching anything below.
+
+## Actual tech stack (ignore "Tech stack" section below)
+
+- **Next.js 16** (App Router, TypeScript, Tailwind), single full-stack app —
+  no separate Python/FastAPI backend, no SnapTrade yet.
+- **Supabase**: Postgres with RLS-scoped multi-tenant tables + Auth
+  (passwordless magic-link only, no password).
+- **Deployed on Vercel**, project `atls4/ledger-check`, production URL
+  `https://ledger-check-henna.vercel.app`. GitHub repo
+  `tyarram262/Ledger-Check` is connected for auto-deploy on push to `main`.
+- AI portfolio-risk digest calls **Claude** (`claude-haiku-4-5` via
+  `@anthropic-ai/sdk`), not Gemini.
+- Holdings/sales are entered manually or via CSV import — no brokerage sync
+  yet (that's Phase 2 below).
+- **Next.js 16 renamed `middleware.ts` → `proxy.ts`** (exported fn is
+  `proxy`, not `middleware`) — this repo uses the new convention
+  (`src/proxy.ts`). AGENTS.md flags that this Next.js version is newer than
+  most training data; verify anything else Next.js-related against
+  `node_modules/next/dist/docs/` rather than assuming.
+- This Mac can't build native npm modules (no working Xcode CLT) — a reason
+  `node:sqlite` was originally chosen over `better-sqlite3`, and later a
+  non-issue for Supabase's pure-JS client. Keep preferring pure-JS/WASM deps.
+
+## Database (Supabase Postgres — no local migrations folder exists)
+
+Schema was applied directly via the Supabase MCP `apply_migration` tool, not
+checked into the repo. To inspect it, query live
+(`mcp__supabase__list_tables` / `execute_sql`) — don't look for a
+`supabase/migrations/` directory.
+
+- `accounts`, `lots`, `sales`, `settings`, `digest_cache` — each has
+  `user_id uuid references auth.users(id) default auth.uid()`, RLS enabled,
+  policies scoped to `(select auth.uid()) = user_id`.
+- `quotes` — shared price cache, deliberately **not** user-scoped; any
+  authenticated user can read/write (non-sensitive data, avoids needing a
+  service-role key anywhere).
+- `record_sell(p_account_id, p_ticker, p_shares, p_sale_price, p_sale_date)`
+  — a `SECURITY INVOKER` Postgres function doing atomic FIFO lot consumption
+  + sale insert, called via `supabase.rpc('record_sell', ...)` from
+  `recordTrade.ts`. Exists because supabase-js has no client-side
+  multi-statement transaction API.
+- **No `SUPABASE_SERVICE_ROLE_KEY` is used anywhere in the app, by design.**
+  Every RLS policy is written so the user's own session is sufficient. Don't
+  introduce the service-role key unless a genuine admin-only operation
+  requires it.
+
+## Auth flow — known rough edges
+
+- `src/proxy.ts` + `src/lib/supabase/proxy.ts` (`updateSession`) gate every
+  route except `/login` and `/auth/*`.
+- `login/actions.ts` derives `emailRedirectTo` from the request's `Origin`
+  header so one Supabase project serves both `localhost:3000` and the
+  production domain — Supabase only has one `Site URL` setting, so a
+  hardcoded `{{ .SiteURL }}` in the email template would break whichever
+  environment isn't primary.
+- **Two separate email templates matter, not one.** `signInWithOtp` sends
+  Supabase's **"Confirm signup"** template for a brand-new email address and
+  **"Magic Link"** for returning users. Both need their link changed to:
+  ```html
+  <a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">...</a>
+  ```
+  As of 2026-07-30, **only "Magic Link" had been fixed** — "Confirm signup"
+  still had the default `{{ .ConfirmationURL }}`, which was the actual cause
+  of a "Safari can't connect" / `otp_expired` failure on first sign-in.
+  **Verify both templates are fixed before assuming auth works.**
+- Supabase Dashboard → Authentication → URL Configuration → Additional
+  Redirect URLs needs both `http://localhost:3000/auth/confirm` and
+  `https://ledger-check-henna.vercel.app/auth/confirm`.
+- Supabase's built-in email sender is rate-limited (observed at 2
+  emails/hour) — expect to hit this during manual testing. A prior custom
+  SMTP misconfiguration (Host field set to `http://localhost:3000`, invalid)
+  was found and fixed by disabling custom SMTP / falling back to the
+  built-in sender.
+- No MCP tool covers Auth/SMTP/email-template config — those are
+  dashboard-only changes only the user can make.
+
+## Domain-logic gaps filled in beyond the original spec
+
+- IRA-permanent wash-sale distinction (`washSale.ts` — `isIraPermanent` on
+  `WashSaleWarning`, per-trigger `isIra`) — implemented and unit-tested.
+- Sector-concentration threshold is user-configurable via the `settings`
+  table and `/settings` page (default 25%), not hardcoded.
+- Disclaimer appears site-wide (`layout.tsx` footer) plus a full `/settings`
+  page with known-limitations copy.
+- Wash-sale check is intentionally **binary** (any ticker match flags,
+  regardless of share counts) — a deliberate, documented MVP simplification,
+  not a bug to "fix."
+
+## Verified vs. not yet verified (as of 2026-07-31)
+
+- **Verified — including the full authenticated click-through that was the
+  last open item.** The magic-link rate limit / broken "Confirm signup"
+  template blocked testing via a real inbox, so the click-through was done
+  by reading the PKCE token straight out of `auth.one_time_tokens` via the
+  Supabase MCP connection (that column holds exactly the value
+  `{{ .TokenHash }}` interpolates into the email) and completing the real
+  `/auth/confirm?token_hash=...&type=email` request with `curl` — same
+  route, same `verifyOtp` call, same cookie plumbing a browser would use.
+  `auth.users.last_sign_in_at`, previously `null`, is now set, which is the
+  clearest proof the flow works end to end. Confirmed `type=email` is the
+  correct OTP type for this route (matches what the already-fixed "Magic
+  Link" template sends).
+  - Every API route exercised with a real authenticated session: account
+    CRUD, lot CRUD (incl. delete), CSV import (incl. malformed-row
+    handling), `record_sell` RPC (real FIFO consumption across two trades,
+    not just unit-tested), settings GET/POST round-trip, Yahoo quote
+    refresh, digest GET/POST (real Claude call + cache), sale delete, and
+    proxy redirect behavior both directions (unauth → `/login`,
+    post-signout → `/login`).
+  - Wash-sale engine verified against real DB-backed data (not just unit
+    tests): a sell-side IRA-permanent case, a sell-side deferred
+    cross-account case, a sell-side case correctly *not* flagged (buy
+    outside the 61-day window), and both IRA/non-IRA flavors of the buy-side
+    "buy-after-loss" case.
+  - `tsc`/`eslint`/50 unit tests still clean after the run; Supabase
+    security+performance advisors re-checked — only pre-existing, by-design
+    items (the intentionally-unrestricted `quotes` INSERT/UPDATE policy;
+    leaked-password-protection, which is moot since this app has no
+    passwords) plus informational unused-index notices from having just
+    started real traffic.
+  - A demo dataset was seeded through the app's own API (not raw SQL) as
+    part of this verification and left in place: 4 accounts (2 taxable, 1
+    Roth, 1 traditional IRA), holdings weighted so Information Technology
+    sits ~56–65% of the portfolio (trips the concentration flag both before
+    and after the demo trades), and 3 recorded sales realizing the wash-sale
+    scenarios above.
+- **Still not verified:** clicking an actual emailed magic link in a real
+  browser. The MCP-token approach reproduces the PKCE flow faithfully but
+  never opens an inbox — that's the last real-world confirmation, and it's
+  dashboard/manual-only (see below).
+
+## The 4-phase roadmap to production readiness
+
+1. **Make it hostable at all** (multi-user auth + hosted DB + deploy) —
+   **Closed**, modulo one manual step only doable from the Supabase
+   dashboard: the "Confirm signup" email template (see below). Everything
+   else — auth, RLS, every API route, the wash-sale/concentration engines
+   against real data, the Claude digest — is verified end to end as of
+   2026-07-31.
+2. **Cut onboarding friction** — SnapTrade brokerage sync so holdings and
+   transactions import automatically instead of manual entry/CSV. Not
+   started.
+3. **Trust & polish** — error tracking (Sentry), rate-limit the digest
+   endpoint, and (if SnapTrade lands) encrypt stored brokerage tokens plus a
+   real privacy policy/ToS. Not started.
+4. **Get users** — a landing/waitlist page pitching the cross-account
+   wash-sale angle; direct outreach in DIY-investor communities (Bogleheads,
+   r/personalfinance, r/investing) rather than paid ads. Not started.
+
+## Two things only the dashboard can fix (not doable via MCP or code)
+
+1. **Authentication → Email Templates → "Confirm signup"** is still on the
+   default `{{ .ConfirmationURL }}` (implicit flow, drops the token in a URL
+   fragment the server never sees). Change its link to
+   `<a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">`,
+   matching the already-fixed "Magic Link" template. This only affects
+   *brand-new* signups — the existing user account is past it, which is why
+   the automated run above couldn't catch it.
+2. **Authentication → URL Configuration → Additional Redirect URLs** —
+   confirm both `http://localhost:3000/auth/confirm` and
+   `https://ledger-check-henna.vercel.app/auth/confirm` are listed.
+
+---
+
 # Ledger-Check MVP — Claude Code Build Prompt
 
 ## Project pitch

@@ -72,23 +72,34 @@ checked into the repo. To inspect it, query live
   still had the default `{{ .ConfirmationURL }}`, which was the actual cause
   of a "Safari can't connect" / `otp_expired` failure on first sign-in.
   **Verify both templates are fixed before assuming auth works.**
-- **Correction (2026-07-31, per user checking the dashboard directly):**
-  editing a template's HTML source is gated behind having **custom SMTP
-  configured** — Supabase won't let you touch "Confirm signup"'s source
-  while still on the built-in sender. This is why the earlier plan to "just
-  edit the template" doesn't work as stated; custom SMTP has to go back on
-  first, correctly configured this time (the prior attempt had Host set to
-  `http://localhost:3000`, which is invalid — see below).
+- **Resolved (2026-07-31).** Editing a template's HTML source turned out to
+  be gated behind having **custom SMTP configured** — the built-in sender
+  doesn't allow it. Custom SMTP is now live via **Resend**
+  (`smtp.resend.com:465`, username `resend`, password = API key, min TLS
+  1.2), and "Confirm signup" has the `{{ .RedirectTo }}?token_hash=...`
+  fix applied. **Verified with a real signup + real inbox click** (not just
+  the MCP-token bypass) — `tanush.yarram@gmail.com` received the actual
+  email, clicked it, and landed authenticated in the app.
+- **New known limitation: Resend sandbox mode.** Without a verified domain,
+  Resend's `onboarding@resend.dev` sender can only deliver to the *exact*
+  email the Resend account was created with — currently
+  `tanush.yarram@gmail.com`. Every other address, including the original
+  `tanush.yarram@icloud.com` account (which holds an earlier, separate copy
+  of the demo dataset — see below), gets a hard `550` rejection, not a soft
+  failure. **`tanush.yarram@gmail.com` is now the primary account to sign in
+  with** until a domain is verified on Resend. Verifying a domain is also
+  the real prerequisite for Phase 4 (letting other people sign up), so it's
+  worth doing together whenever that's picked up rather than twice.
 - Supabase Dashboard → Authentication → URL Configuration → Additional
   Redirect URLs needs both `http://localhost:3000/auth/confirm` and
   `https://ledger-check-henna.vercel.app/auth/confirm`.
-- Supabase's built-in email sender is rate-limited (observed at 2
-  emails/hour) — expect to hit this during manual testing. A prior custom
-  SMTP misconfiguration (Host field set to `http://localhost:3000`, invalid)
-  was found and fixed by disabling custom SMTP / falling back to the
-  built-in sender. Re-enabling custom SMTP (now required to fix the
-  template, see above) means picking a real SMTP provider and getting the
-  Host/Port/Username/Password right this time.
+- Custom SMTP raised the auth email rate limit from 2/hour to 30/hour
+  (confirmed in Supabase auth logs).
+- `login/actions.ts` falls back to a friendly message when
+  `signInWithOtp`'s error has an unreadable `message` (observed: the literal
+  string `"{}"` from an `AuthRetryableFetchError` when Resend rejects a
+  send) — added 2026-07-31 after hitting this live via the icloud.com
+  sandbox rejection above.
 - No MCP tool covers Auth/SMTP/email-template config — those are
   dashboard-only changes only the user can make.
 
@@ -142,20 +153,31 @@ checked into the repo. To inspect it, query live
     sits ~56–65% of the portfolio (trips the concentration flag both before
     and after the demo trades), and 3 recorded sales realizing the wash-sale
     scenarios above.
-- **Still not verified:** clicking an actual emailed magic link in a real
-  browser. The MCP-token approach reproduces the PKCE flow faithfully but
-  never opens an inbox — that's the last real-world confirmation, and it's
-  dashboard/manual-only (see below).
+- **Also verified (2026-07-31, later same session):** a real emailed
+  "Confirm signup" link, clicked in an actual browser — the one thing the
+  MCP-token approach structurally couldn't confirm on its own, since it
+  bypasses the template's rendered HTML entirely. Custom SMTP (Resend) is
+  live and the template fix is real, not just theoretically applied. See
+  the Resend sandbox-mode limitation above for the one new constraint this
+  surfaced. **Nothing about the original auth flow remains unverified.**
+  - The demo dataset was recreated under `tanush.yarram@gmail.com` (now the
+    account to actually sign in with, per the sandbox limitation above) —
+    same shape as the original: 4 accounts, holdings tripping the
+    concentration threshold, the 3 wash-sale sells recorded. The original
+    copy under `tanush.yarram@icloud.com` still exists but that account is
+    currently unreachable by email.
 
 ## The 4-phase roadmap to production readiness
 
 1. **Make it hostable at all** (multi-user auth + hosted DB + deploy) —
-   **Closed for the existing account.** Auth, RLS, every API route, the
-   wash-sale/concentration engines against real data, and the Claude digest
-   are all verified end to end as of 2026-07-31. **Still open for brand-new
-   signups:** the "Confirm signup" email template (see below) — fixing it
-   requires custom SMTP to be configured first, which is dashboard-only and
-   needs a provider decision from the user.
+   **Fully closed, 2026-07-31.** Auth (including a real "Confirm signup"
+   email click-through, not just the MCP-token bypass), RLS, every API
+   route, the wash-sale/concentration engines against real data, and the
+   Claude digest are all verified end to end. One caveat carried forward,
+   not a Phase 1 gap: Resend sandbox mode limits which address can
+   currently receive auth emails (see "Auth flow" above) — solvable by
+   verifying a domain whenever that's convenient, and worth bundling with
+   Phase 4 since that phase needs it too.
 2. **Cut onboarding friction** — SnapTrade brokerage sync so holdings and
    transactions import automatically instead of manual entry/CSV. Not
    started.
@@ -166,26 +188,15 @@ checked into the repo. To inspect it, query live
    wash-sale angle; direct outreach in DIY-investor communities (Bogleheads,
    r/personalfinance, r/investing) rather than paid ads. Not started.
 
-## Two things only the dashboard can fix (not doable via MCP or code)
+## One dashboard item left for whenever Phase 4 starts
 
-1. **Authentication → Email Templates → "Confirm signup"** is still on the
-   default `{{ .ConfirmationURL }}` (implicit flow, drops the token in a URL
-   fragment the server never sees). It needs the same fix already applied to
-   "Magic Link":
-   `<a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">`.
-   **Blocked on a prerequisite:** per the user (2026-07-31), Supabase won't
-   let you edit a template's source while running on the built-in email
-   sender — custom SMTP has to be configured first. Requires: (a) picking an
-   SMTP provider and creating an account with it, (b) entering its
-   Host/Port/Username/Password into Authentication → Sign In / Providers →
-   SMTP Settings correctly (the prior attempt had Host set to
-   `http://localhost:3000`, which is invalid — don't repeat that), (c) then
-   editing the template. This only affects *brand-new* signups — the
-   existing user account is past it, which is why the automated verification
-   run above couldn't catch it.
-2. **Authentication → URL Configuration → Additional Redirect URLs** —
-   confirm both `http://localhost:3000/auth/confirm` and
-   `https://ledger-check-henna.vercel.app/auth/confirm` are listed.
+**Authentication → SMTP Settings → verify a domain on Resend**, then switch
+Sender email off `onboarding@resend.dev` to an address on that domain. Not
+blocking anything today (single-user use works fine on
+`tanush.yarram@gmail.com`), but required before other people can sign up —
+Resend's sandbox mode hard-rejects any recipient besides the account's own
+verified email. See "Auth flow — known rough edges" above for the full
+story.
 
 ---
 

@@ -25,7 +25,14 @@ export async function login(
     options: origin ? { emailRedirectTo: `${origin}/auth/confirm` } : undefined,
   });
   if (error) {
-    return { error: error.message };
+    // Some failures (e.g. the SMTP provider rejecting the send) surface as
+    // an AuthRetryableFetchError whose message is the literal string "{}" —
+    // fall back to something readable rather than showing that verbatim.
+    const message =
+      error.message && error.message !== "{}"
+        ? error.message
+        : "Something went wrong sending the sign-in link. Please try again in a moment.";
+    return { error: message };
   }
   return { sent: true };
 }

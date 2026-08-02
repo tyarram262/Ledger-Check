@@ -1,12 +1,21 @@
 @AGENTS.md
-# Session handoff — READ THIS FIRST (updated 2026-07-31)
+# Session handoff — READ THIS FIRST (updated 2026-08-02)
 
-The build prompt below this section is the **original spec**. Its domain-logic
-sections (wash-sale rules, sector concentration) are still authoritative. Its
-**tech stack, data model, and API endpoint sections are stale** — the user
-confirmed early on to keep the stack that actually got built and fill gaps
-against the spec, rather than rewrite to match it. Read this section before
-touching anything below.
+Three layers below, in order: this handoff section (operational reality —
+read it first), then a **product mission/principles doc** (the north star —
+added 2026-08-02, aspirational in places, flagged where it diverges from
+what's actually built), then the **original build prompt** (old spec —
+still authoritative for the domain-logic sections it covers: wash-sale
+rules, sector concentration; everything else in it is superseded by the
+mission doc or this handoff section).
+
+**Tech stack, data model, and API endpoint sections in the old build
+prompt are stale** — the user confirmed early on to keep the stack that
+actually got built and fill gaps against the spec, rather than rewrite to
+match it. That decision was reaffirmed 2026-08-02 when the new mission doc
+below specified a different backend (FastAPI/Python/Redis) — see "Note on
+the Architecture section below" for why it stays aspirational, not a
+migration directive.
 
 ## Actual tech stack (ignore "Tech stack" section below)
 
@@ -102,7 +111,80 @@ checked into the repo. To inspect it, query live
   regardless of share counts) — a deliberate, documented MVP simplification,
   not a bug to "fix."
 
-## Verified vs. not yet verified (as of 2026-07-31)
+## MVP feature set: Trade Check, Tax Check, Portfolio Health Score (added 2026-08-02)
+
+Built on top of the wash-sale/concentration engines above, not a rewrite.
+User's explicit framing: "forget AI agents, forget autonomous investing,
+build something people can trust" — every score here is deterministic and
+explainable (no LLM in this path; the Claude digest in `digest.ts` is
+separate free-text prose, unchanged).
+
+- **Trade Check** (`/simulate`, `simulate.ts` → `SimulationResult`) —
+  existing concentration/sector-impact output plus:
+  - **ETF look-through overlap** (`etfOverlap.ts` + `src/data/etf-holdings.json`)
+    — a hand-curated, static top-~10-25-holdings snapshot for the 24 known
+    ETFs (empty + a `note` for funds we can't decompose: AGG/BND/GLD bonds
+    &amp; gold, IWM small-cap, VEA/VXUS/VWO international). Computes "true"
+    look-through exposure to the traded ticker and flags near-duplicate
+    funds you already hold (e.g. buying VOO while holding SPY).
+  - **Diversification/risk score deltas** (`scores.ts`) — before/after,
+    shown in `ScoreDeltaPanel`.
+- **Tax Check** (sell side of `/simulate`, `taxCheck.ts`) — reuses
+  `checkWashSale` verbatim, adds:
+  - Short/long-term classification per consumed lot (`holdingPeriod.ts`,
+    the >365-day IRS rule), a short-term-gain warning, and a **long-term
+    countdown** ("wait N days, save ~$X") — the standout feature, since no
+    broker surfaces this well.
+  - Estimated tax (`taxRates.ts` — 2026 federal brackets + NIIT, verified
+    against current sources during implementation, not recalled from
+    memory) combined with a user-set filing status/income/state-rate
+    profile from `/settings`.
+  - **IRA sells return zeroed tax figures with an explanation, never a
+    fabricated number** — a Roth/traditional-IRA sell has no current-year
+    tax consequence, and this was a deliberate trust-preserving call.
+- **Portfolio Health Score** (dashboard, `/api/health` → `health.ts` →
+  `scores.ts`) — five sub-scores (Diversification, Concentration, Sector
+  balance, Tax efficiency, Cash allocation) rolled into an overall A–F
+  grade, each with a plain-English sentence. Persisted once/day in
+  `health_snapshots` (upserted on `user_id, snapshot_date`, so repeat loads
+  the same day update rather than duplicate) for a trend sparkline.
+  - **Tax efficiency is computed from unrealized lot data only** — the
+    `sales` table has no acquisition date, so realized short/long-term
+    can't be reconstructed retroactively. Deliberate, not a gap to fix
+    without a `sales` schema change (which would also touch the
+    `record_sell` RPC).
+
+**Schema additions** (migration `mvp_cash_tax_profile_health`, applied
+2026-08-02): `accounts.cash_balance`; `settings.filing_status` /
+`annual_taxable_income` / `state_tax_rate`; new `health_snapshots` table
+(RLS-scoped like every other per-user table, `(select auth.uid()) = user_id`
+on select/insert/update, following the same pattern as `settings`). No
+`sales` schema change — see tax-efficiency note above.
+
+**117 new unit tests** (131 total) across `holdingPeriod.test.ts`,
+`taxRates.test.ts`, `taxCheck.test.ts`, `etfHoldings.test.ts`,
+`etfOverlap.test.ts`, `scores.test.ts`, plus extensions to
+`simulate.test.ts`/`washSale.test.ts`. `tsc`/`eslint`/`next build` all
+clean; Supabase advisors show no new issues from the migration.
+
+**Deployed**: pushed to `main` (commit `9eac45b`, plus 4 previously-unpushed
+Phase 1 commits that went out in the same push) — Vercel auto-deploy
+confirmed live via `curl -I https://ledger-check-henna.vercel.app/`
+(307 → `/login`) and `/login` (200) at 2026-08-02 ~20:04 UTC.
+
+**Not yet verified: no real authenticated browser pass on these features.**
+Unlike Phase 1's auth work (verified with a real signup, inbox, and clicked
+link), this session had no way to complete a magic-link click-through —
+verification stopped at unit tests + `next build` + a curl-level check that
+the unauthenticated proxy redirect still works. **Whoever reads this next
+should sign in as `tanush.yarram@gmail.com` and click through the health
+score, the trade-check panels (overlap, score deltas), the tax-check panel
+(short-term warning, long-term countdown, estimated tax, the IRA
+zero-tax case), and the settings tax-profile form before trusting the UI
+layer** — the domain logic is unit-tested solid, but nothing above has been
+looked at with real eyes yet.
+
+## Verified vs. not yet verified — Phase 1 / auth (as of 2026-07-31)
 
 **Verified end to end — nothing about auth or the core flows remains
 unproven.** A full authenticated pass was made against the live Supabase
@@ -160,6 +242,439 @@ blocking anything today (single-user use works fine on
 `tanush.yarram@gmail.com`), but required before other people can sign up —
 Resend's sandbox mode hard-rejects any recipient besides the account's own
 verified email. See "Auth flow" above for the full story.
+
+---
+
+# Product mission & principles (north star, added 2026-08-02)
+
+The user's framing: choose whichever version gives this the best real
+chance at users and profitability. This doc is that version — kept in
+full below, with two editorial notes (marked **[HANDOFF NOTE]**) tying it
+back to what's actually built, so it doesn't silently drift from reality
+the way the old build prompt did.
+
+## Mission
+
+Ledger Check is an AI-powered pre-trade decision assistant for self-directed retail investors.
+
+We are NOT building another brokerage.
+
+We are NOT building another portfolio tracker.
+
+We are building the "Grammarly for Investing."
+
+Every feature should answer one question:
+
+"Will this help an investor make a better decision BEFORE they trade?"
+
+If a feature only shows historical information without helping future decisions, challenge whether it belongs in the MVP.
+
+---
+
+# Product Principles
+
+Prioritize:
+
+1. Prevent expensive mistakes.
+2. Explain WHY something matters.
+3. Keep recommendations transparent.
+4. Never make buy/sell decisions.
+5. Help users think instead of replacing them.
+
+Ledger Check is a decision-support tool.
+
+It is NOT an autonomous investment advisor.
+
+---
+
+# Target Users
+
+Primary:
+
+Self-directed retail investors with portfolios between $10k-$2M.
+
+Typical characteristics:
+
+- Uses Robinhood, Fidelity, Schwab, Interactive Brokers, or Webull.
+- Owns ETFs and individual stocks.
+- Wants long-term wealth building.
+- Understands investing basics.
+- Does not understand taxes, portfolio overlap, or concentration risk.
+
+---
+
+# Core Value Proposition
+
+Before making a trade, users should receive an instant "Ledger Check."
+
+Example:
+
+User:
+
+"I want to buy 20 shares of NVIDIA."
+
+Ledger Check should analyze:
+
+- Concentration impact
+- Sector exposure
+- ETF overlap
+- Diversification impact
+- Tax implications
+- Risk changes
+- Position sizing
+- Behavioral warnings
+
+The app should explain these clearly.
+
+Never simply output a score.
+
+**[HANDOFF NOTE]** Concentration impact, sector exposure, ETF overlap,
+diversification impact, risk changes, and an overall trade-health score
+delta are all live today — see "MVP feature set" above (`simulate.ts`,
+`etfOverlap.ts`, `scores.ts`, rendered via `ScoreDeltaPanel`/`OverlapPanel`
+on `/simulate`). Tax implications are live via the separate Tax Check flow
+on the sell side. Position sizing and behavioral warnings are not built —
+candidates for next iteration.
+
+---
+
+# MVP
+
+Build ONLY these features first.
+
+## Feature 1
+
+Portfolio Import
+
+Support:
+
+- CSV
+- Manual entry
+
+Design architecture so brokerage APIs (Plaid, SnapTrade, etc.) can be added later.
+
+**[HANDOFF NOTE]** CSV + manual entry both exist (`/holdings`,
+`csvImport.ts`). The "design for pluggable brokerage APIs later" part is
+**not** done — there's no `BrokerageProvider`-style interface; `queries.ts`
+talks to Supabase directly. SnapTrade integration is Phase 2 of the
+roadmap below and would be the natural point to introduce that
+abstraction, not before it's needed.
+
+---
+
+## Feature 2
+
+Trade Check
+
+Inputs:
+
+Ticker
+
+Shares
+
+Buy/Sell
+
+Outputs:
+
+- Concentration warning
+- Sector allocation changes
+- ETF overlap
+- Diversification impact
+- Estimated volatility impact
+- Portfolio allocation after trade
+- Overall trade health score
+
+**[HANDOFF NOTE]** All live except "estimated volatility impact" (no
+price-history/beta data source exists yet — `quotes.ts` only stores a
+current price, not a return series).
+
+---
+
+## Feature 3
+
+Tax Check
+
+Detect:
+
+- Wash sale risk
+- Short vs long-term capital gains
+- Estimated realized gain/loss
+- Tax lot selection (future)
+
+Never estimate taxes without clearly labeling assumptions.
+
+**[HANDOFF NOTE]** All live (`washSale.ts`, `holdingPeriod.ts`,
+`taxCheck.ts`). Lot selection is FIFO-only, matching "tax lot selection
+(future)" being explicitly out of scope for now. Every tax figure in the
+UI carries an "estimate only — not tax advice" label per the "never
+estimate without labeling assumptions" rule here.
+
+---
+
+## Feature 4
+
+Portfolio Health
+
+Generate scores for:
+
+Diversification
+
+Sector Balance
+
+Concentration
+
+Tax Efficiency
+
+Cash Allocation
+
+Risk
+
+Each score must include actionable recommendations.
+
+**[HANDOFF NOTE]** The five daily-persisted sub-scores
+(Diversification/Concentration/Sector Balance/Tax Efficiency/Cash
+Allocation — `scores.ts`, `/api/health`) match this list exactly. Risk is
+currently a per-trade score inside Trade Check, not a sixth daily
+sub-score on the health card — folding it in would just mean calling
+`riskScore` from `computeAndPersistHealth` in `health.ts` and adding a
+6th weight to `HEALTH_SCORE_WEIGHTS`, a small follow-up. **Gap:** none of
+the six sub-scores currently render an "actionable recommendation," only
+a descriptive sentence (e.g. "38% of your portfolio is in Information
+Technology — that's elevated concentration"). Turning each sentence into
+a specific recommendation ("consider trimming X by $Y to get under Z%")
+is unbuilt and would need product decisions about how prescriptive to be
+without crossing into "AI makes buy/sell decisions."
+
+---
+
+## Feature 5
+
+Investment Journal
+
+When purchasing an investment:
+
+Ask:
+
+- Why are you buying?
+- What is your time horizon?
+- What would make you sell?
+- What risks concern you?
+
+Save these.
+
+Reference them later.
+
+**[HANDOFF NOTE]** Not started. Would need a new table (journal entries
+keyed to a lot or a ticker+account, RLS-scoped like every other table
+here) and a step in the buy flow (`LotForm.tsx` / `recordTrade.ts`)
+prompting for these four answers, plus somewhere to surface them back —
+natural fit next to a position in `HoldingsTable.tsx` or as context fed
+into the Claude digest (`digest.ts`) so the AI summary can reference the
+user's own stated thesis ("you said you were buying for a 5-year horizon;
+you're now 8 months in").
+
+---
+
+# Design Philosophy
+
+Every page should answer one of three questions.
+
+1.
+
+How healthy is my portfolio?
+
+2.
+
+Should I make this trade?
+
+3.
+
+What changed?
+
+Avoid unnecessary dashboards.
+
+Avoid information overload.
+
+---
+
+# AI Philosophy
+
+The AI should behave like a calm fiduciary-style reviewer.
+
+It should challenge assumptions.
+
+Examples:
+
+"You already own similar exposure through QQQ."
+
+"This increases technology allocation from 28% to 42%."
+
+"This sale may trigger a wash sale."
+
+"This position becomes your largest holding."
+
+Never:
+
+"Buy this."
+
+"Sell this."
+
+"This stock will outperform."
+
+Avoid predictions.
+
+**[HANDOFF NOTE]** The ETF-overlap sentence generator in `etfOverlap.ts`
+already produces almost exactly the first example verbatim ("You already
+hold AAPL indirectly through QQQ..."), and the concentration verdict in
+`concentration.ts` produces close variants of the second and fourth. These
+are deterministic, not AI-generated — matches the broader principle below
+that financial calculations must never live inside a prompt. The Claude
+digest (`digest.ts`) is the one place actual AI prose ships today, and its
+prompt already avoids buy/sell/outperform framing — worth a deliberate
+audit against this "never" list next time it's touched.
+
+---
+
+# Engineering Principles
+
+Write clean, modular code.
+
+Prefer readability over cleverness.
+
+Strong typing.
+
+Reusable components.
+
+No duplicated business logic.
+
+Separate:
+
+UI
+
+Business Logic
+
+Financial Calculations
+
+AI Prompting
+
+API Layer
+
+---
+
+# Architecture
+
+Frontend
+
+Next.js
+
+React
+
+TypeScript
+
+Tailwind
+
+shadcn/ui
+
+Backend
+
+FastAPI
+
+Python
+
+PostgreSQL
+
+Redis
+
+AI
+
+OpenAI-compatible abstraction layer.
+
+Never tightly couple to one LLM provider.
+
+Financial calculations should NOT rely on AI.
+
+LLMs explain results.
+
+Deterministic code computes results.
+
+**[HANDOFF NOTE] Note on the Architecture section above: this stays
+aspirational, not a migration directive** (explicit user decision,
+2026-08-02). What's actually running: Next.js 16 full-stack (App Router,
+TypeScript, Tailwind — no shadcn/ui component library adopted, everything
+is hand-rolled Tailwind, see "Shared UI components" pattern), Supabase
+Postgres for both the database and auth (no separate FastAPI/Python
+service, no Redis — see "Actual tech stack" at the top of this file for
+the full, current picture and why it diverged from every prior spec
+including this one). The AI layer is tied directly to Anthropic's SDK
+(`@anthropic-ai/sdk`, not an OpenAI-compatible abstraction) — a real gap
+against "never tightly couple to one LLM provider" if multi-provider
+support ever becomes a priority, but a reasonable simplification for a
+single-model MVP. "Financial calculations should NOT rely on AI, LLMs
+explain results" is fully honored: every score/warning in this codebase
+(`washSale.ts`, `taxCheck.ts`, `scores.ts`, `etfOverlap.ts`) is
+deterministic; `digest.ts` is the only AI call and it only narrates
+numbers computed elsewhere, never computes them itself.
+
+---
+
+# Coding Standards
+
+Always:
+
+Write tests for business logic.
+
+Document financial calculations.
+
+Use descriptive names.
+
+Validate user inputs.
+
+Return typed objects.
+
+Never:
+
+Hardcode financial assumptions.
+
+Mix UI with business logic.
+
+Put financial calculations inside prompts.
+
+Hide calculations from users.
+
+---
+
+# Future Vision
+
+Ledger Check eventually becomes the operating system for self-directed investors.
+
+Future modules:
+
+- Brokerage integrations
+- Options analysis
+- Tax-loss harvesting
+- Rebalancing engine
+- Portfolio drift detection
+- Dividend forecasting
+- AI portfolio review
+- Advisor dashboard
+- CPA dashboard
+
+Do not implement these until the MVP demonstrates product-market fit.
+
+---
+
+# Success Metric
+
+A successful user journey is:
+
+1. User opens Ledger Check before every trade.
+2. User understands the tradeoffs.
+3. User makes a more informed decision.
+4. User trusts Ledger Check enough to make it part of every investing workflow.
+
+Every new feature should increase one of these outcomes.
+
+If it doesn't, question whether it belongs.
 
 ---
 

@@ -49,7 +49,7 @@ export default async function RootLayout({
                   Holdings
                 </Link>
                 <Link href="/simulate" className="hover:text-slate-900">
-                  Simulate a trade
+                  Trade check
                 </Link>
                 <Link href="/settings" className="hover:text-slate-900">
                   Disclaimer &amp; settings

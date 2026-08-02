@@ -1,10 +1,10 @@
-import { getConcentrationThreshold } from "@/lib/queries";
+import { getSettings } from "@/lib/queries";
 import SettingsForm from "@/components/SettingsForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const threshold = await getConcentrationThreshold();
+  const settings = await getSettings();
 
   return (
     <div className="space-y-6">
@@ -47,23 +47,46 @@ export default async function SettingsPage() {
           </li>
           <li>
             Sector mapping is a static local table. ETFs are mapped to a
-            single &ldquo;primary tilt&rdquo; sector, not a true
-            holding-level look-through, and tickers outside the table show up
-            as &ldquo;Unmapped.&rdquo;
+            single &ldquo;primary tilt&rdquo; sector for concentration
+            purposes, and tickers outside the table show up as
+            &ldquo;Unmapped.&rdquo;
+          </li>
+          <li>
+            <strong>Fund overlap</strong> (Trade Check) uses a static,
+            hand-curated snapshot of each fund&apos;s top ~10-25 holdings —
+            not live data, and not the fund&apos;s full holdings list. It&apos;s
+            an approximation, dated on each fund&apos;s entry.
+          </li>
+          <li>
+            <strong>Estimated tax</strong> (Tax Check) is a marginal-rate
+            approximation: current-year federal brackets plus your flat state
+            rate. It does not model AMT, other income sources, itemized
+            deductions, or state-specific rules beyond a single flat rate.
+          </li>
+          <li>
+            <strong>Tax efficiency</strong> (Portfolio Health Score) is
+            computed only from <em>unrealized</em> positions &mdash; the sales
+            you&apos;ve recorded don&apos;t store an acquisition date, so
+            realized short/long-term gains can&apos;t be reconstructed.
+          </li>
+          <li>
+            The Portfolio Health Score is a deterministic, rules-based
+            summary of your current holdings &mdash; not a prediction, not
+            investment advice, and not personalized beyond the tax profile
+            you set here.
           </li>
         </ul>
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-5">
-        <h2 className="text-base font-semibold">
-          Sector concentration threshold
-        </h2>
+        <h2 className="text-base font-semibold">Concentration &amp; tax profile</h2>
         <p className="mb-4 mt-1 text-sm text-slate-500">
-          The dashboard and trade simulator flag a sector as
-          &ldquo;elevated&rdquo; once it crosses this percentage of your
-          portfolio (and &ldquo;high&rdquo; well above that). Default is 25%.
+          The dashboard and trade check flag a sector as &ldquo;elevated&rdquo;
+          once it crosses the threshold below (and &ldquo;high&rdquo; well
+          above that). Your tax profile drives the estimated tax shown on the
+          sell side of the trade check.
         </p>
-        <SettingsForm initialThreshold={threshold} />
+        <SettingsForm initialSettings={settings} />
       </section>
     </div>
   );

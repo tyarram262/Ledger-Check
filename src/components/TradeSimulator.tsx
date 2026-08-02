@@ -6,6 +6,9 @@ import type { Account } from "@/lib/types";
 import type { SimulationResult, Severity } from "@/lib/simulate";
 import { formatUsd } from "@/lib/format";
 import TickerHint from "@/components/TickerHint";
+import OverlapPanel from "@/components/OverlapPanel";
+import TaxCheckPanel from "@/components/TaxCheckPanel";
+import ScoreDeltaPanel from "@/components/ScoreDeltaPanel";
 
 const SEVERITY_STYLES: Record<Severity, string> = {
   ok: "border-emerald-200 bg-emerald-50 text-emerald-800",
@@ -256,6 +259,12 @@ export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
               (FIFO).
             </p>
           )}
+
+          <ScoreDeltaPanel diversification={result.scores.diversification} risk={result.scores.risk} />
+
+          <OverlapPanel overlap={result.etfOverlap} />
+
+          {result.taxCheck && <TaxCheckPanel taxCheck={result.taxCheck} />}
 
           <section className="rounded-lg border border-slate-200 bg-white p-5">
             <h3 className="text-base font-semibold">

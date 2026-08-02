@@ -50,6 +50,10 @@ export interface SellPreview {
   realizedGainLoss: number;
   /** Lots (or partial lots) that remain held after the sell. */
   remainingLots: { lot: Lot; remainingShares: number }[];
+  /** Per-lot detail of exactly how many shares of each lot this sell would
+   *  consume, oldest lot first (FIFO order) — needed for per-lot tax
+   *  classification (short vs. long term), which an averaged basis can't give. */
+  consumedLots: { lot: Lot; shares: number }[];
 }
 
 export function previewFifoSell(
@@ -66,11 +70,15 @@ export function previewFifoSell(
   const sharesSold = toSell;
   let costOfSold = 0;
   const remainingLots: { lot: Lot; remainingShares: number }[] = [];
+  const consumedLots: { lot: Lot; shares: number }[] = [];
 
   for (const lot of accountLots) {
     const sold = Math.min(lot.shares, toSell);
     costOfSold += sold * lot.costPerShare;
     toSell -= sold;
+    if (sold > 0) {
+      consumedLots.push({ lot, shares: sold });
+    }
     if (lot.shares - sold > 0) {
       remainingLots.push({ lot, remainingShares: lot.shares - sold });
     }
@@ -83,6 +91,7 @@ export function previewFifoSell(
     avgCostPerShare,
     realizedGainLoss: (trade.pricePerShare - avgCostPerShare) * sharesSold,
     remainingLots,
+    consumedLots,
   };
 }
 

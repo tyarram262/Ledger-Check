@@ -1,6 +1,6 @@
 import { listAccounts, listLots, listSales } from "@/lib/queries";
-import { ACCOUNT_TYPE_LABELS } from "@/lib/types";
 import AccountForm from "@/components/AccountForm";
+import AccountCashEditor from "@/components/AccountCashEditor";
 import LotForm from "@/components/LotForm";
 import SaleForm from "@/components/SaleForm";
 import HoldingsTable from "@/components/HoldingsTable";
@@ -26,19 +26,11 @@ export default async function HoldingsPage() {
 
       <section className="rounded-lg border border-slate-200 bg-white p-5">
         <h2 className="text-base font-semibold">Accounts</h2>
-        <ul className="mt-2 flex flex-wrap gap-2 text-sm">
-          {accounts.map((a) => (
-            <li
-              key={a.id}
-              className="rounded-full bg-slate-100 px-3 py-1 text-slate-700"
-            >
-              {a.name}
-              <span className="ml-1.5 text-xs text-slate-400">
-                {ACCOUNT_TYPE_LABELS[a.type]}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <p className="mt-1 text-sm text-slate-500">
+          Cash balances feed the cash-allocation part of your portfolio
+          health score — click a figure to edit it.
+        </p>
+        <AccountCashEditor accounts={accounts} />
         <div className="mt-4">
           <AccountForm />
         </div>

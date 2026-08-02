@@ -12,12 +12,13 @@ export default async function SimulatePage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
-          Trade simulator
+          Trade check
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Gut-check a trade before you place it: how it shifts your sector
-          concentration, and whether it risks a wash sale — across all your
-          accounts, including IRAs.
+          Gut-check a trade before you place it: sector concentration, fund
+          overlap, and diversification/risk impact on buys — plus wash-sale
+          risk and an estimated tax hit on sells — across all your accounts,
+          including IRAs.
         </p>
       </div>
 

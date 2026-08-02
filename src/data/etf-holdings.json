@@ -1,0 +1,329 @@
+{
+  "QQQ": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "AAPL", "weight": 8.9 },
+      { "ticker": "MSFT", "weight": 8.5 },
+      { "ticker": "NVDA", "weight": 8.3 },
+      { "ticker": "AMZN", "weight": 5.6 },
+      { "ticker": "AVGO", "weight": 4.5 },
+      { "ticker": "META", "weight": 3.8 },
+      { "ticker": "NFLX", "weight": 3.2 },
+      { "ticker": "TSLA", "weight": 3.0 },
+      { "ticker": "COST", "weight": 2.4 },
+      { "ticker": "GOOGL", "weight": 2.3 },
+      { "ticker": "GOOG", "weight": 2.2 },
+      { "ticker": "ADBE", "weight": 1.6 },
+      { "ticker": "AMD", "weight": 1.5 },
+      { "ticker": "PEP", "weight": 1.4 },
+      { "ticker": "CSCO", "weight": 1.3 }
+    ]
+  },
+  "SPY": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "AAPL", "weight": 7.1 },
+      { "ticker": "MSFT", "weight": 6.8 },
+      { "ticker": "NVDA", "weight": 6.5 },
+      { "ticker": "AMZN", "weight": 3.8 },
+      { "ticker": "META", "weight": 2.6 },
+      { "ticker": "GOOGL", "weight": 2.1 },
+      { "ticker": "AVGO", "weight": 2.0 },
+      { "ticker": "GOOG", "weight": 1.8 },
+      { "ticker": "BRK.B", "weight": 1.7 },
+      { "ticker": "TSLA", "weight": 1.6 },
+      { "ticker": "JPM", "weight": 1.4 },
+      { "ticker": "LLY", "weight": 1.3 },
+      { "ticker": "V", "weight": 1.1 },
+      { "ticker": "XOM", "weight": 1.1 },
+      { "ticker": "UNH", "weight": 1.0 }
+    ]
+  },
+  "VOO": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "AAPL", "weight": 7.0 },
+      { "ticker": "MSFT", "weight": 6.7 },
+      { "ticker": "NVDA", "weight": 6.4 },
+      { "ticker": "AMZN", "weight": 3.7 },
+      { "ticker": "META", "weight": 2.5 },
+      { "ticker": "GOOGL", "weight": 2.1 },
+      { "ticker": "AVGO", "weight": 2.0 },
+      { "ticker": "GOOG", "weight": 1.8 },
+      { "ticker": "BRK.B", "weight": 1.7 },
+      { "ticker": "TSLA", "weight": 1.6 },
+      { "ticker": "JPM", "weight": 1.4 },
+      { "ticker": "LLY", "weight": 1.3 },
+      { "ticker": "V", "weight": 1.1 },
+      { "ticker": "XOM", "weight": 1.0 },
+      { "ticker": "UNH", "weight": 1.0 }
+    ]
+  },
+  "IVV": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "AAPL", "weight": 7.0 },
+      { "ticker": "MSFT", "weight": 6.7 },
+      { "ticker": "NVDA", "weight": 6.4 },
+      { "ticker": "AMZN", "weight": 3.7 },
+      { "ticker": "META", "weight": 2.5 },
+      { "ticker": "GOOGL", "weight": 2.1 },
+      { "ticker": "AVGO", "weight": 2.0 },
+      { "ticker": "GOOG", "weight": 1.8 },
+      { "ticker": "BRK.B", "weight": 1.7 },
+      { "ticker": "TSLA", "weight": 1.6 },
+      { "ticker": "JPM", "weight": 1.4 },
+      { "ticker": "LLY", "weight": 1.3 },
+      { "ticker": "V", "weight": 1.1 },
+      { "ticker": "XOM", "weight": 1.0 },
+      { "ticker": "UNH", "weight": 1.0 }
+    ]
+  },
+  "VTI": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "AAPL", "weight": 6.0 },
+      { "ticker": "MSFT", "weight": 5.7 },
+      { "ticker": "NVDA", "weight": 5.5 },
+      { "ticker": "AMZN", "weight": 3.2 },
+      { "ticker": "META", "weight": 2.1 },
+      { "ticker": "GOOGL", "weight": 1.8 },
+      { "ticker": "AVGO", "weight": 1.7 },
+      { "ticker": "GOOG", "weight": 1.5 },
+      { "ticker": "BRK.B", "weight": 1.5 },
+      { "ticker": "TSLA", "weight": 1.4 },
+      { "ticker": "JPM", "weight": 1.2 },
+      { "ticker": "LLY", "weight": 1.1 },
+      { "ticker": "V", "weight": 1.0 },
+      { "ticker": "XOM", "weight": 0.9 },
+      { "ticker": "UNH", "weight": 0.9 }
+    ]
+  },
+  "DIA": {
+    "asOf": "2026-06",
+    "note": "Price-weighted index — weights shift with share price more than the market-cap-weighted funds above and drift faster between updates.",
+    "holdings": [
+      { "ticker": "UNH", "weight": 9.0 },
+      { "ticker": "GS", "weight": 7.0 },
+      { "ticker": "MSFT", "weight": 6.0 },
+      { "ticker": "HD", "weight": 5.5 },
+      { "ticker": "CAT", "weight": 5.0 },
+      { "ticker": "CRM", "weight": 4.5 },
+      { "ticker": "V", "weight": 4.3 },
+      { "ticker": "AXP", "weight": 4.2 },
+      { "ticker": "AMGN", "weight": 4.0 },
+      { "ticker": "MCD", "weight": 3.8 },
+      { "ticker": "BA", "weight": 3.5 },
+      { "ticker": "HON", "weight": 3.0 },
+      { "ticker": "IBM", "weight": 3.0 },
+      { "ticker": "TRV", "weight": 2.8 },
+      { "ticker": "JPM", "weight": 2.7 }
+    ]
+  },
+  "SCHD": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "HD", "weight": 4.3 },
+      { "ticker": "ABBV", "weight": 4.2 },
+      { "ticker": "CVX", "weight": 4.1 },
+      { "ticker": "KO", "weight": 4.0 },
+      { "ticker": "PEP", "weight": 3.9 },
+      { "ticker": "VZ", "weight": 3.8 },
+      { "ticker": "PM", "weight": 3.7 },
+      { "ticker": "TXN", "weight": 3.6 },
+      { "ticker": "AVGO", "weight": 3.5 },
+      { "ticker": "AMGN", "weight": 3.4 },
+      { "ticker": "MRK", "weight": 3.3 },
+      { "ticker": "CSCO", "weight": 3.2 },
+      { "ticker": "LMT", "weight": 3.1 },
+      { "ticker": "MO", "weight": 3.0 },
+      { "ticker": "BLK", "weight": 2.9 }
+    ]
+  },
+  "SMH": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "NVDA", "weight": 20.0 },
+      { "ticker": "TSM", "weight": 12.0 },
+      { "ticker": "AVGO", "weight": 8.0 },
+      { "ticker": "AMD", "weight": 5.0 },
+      { "ticker": "QCOM", "weight": 4.5 },
+      { "ticker": "TXN", "weight": 4.3 },
+      { "ticker": "AMAT", "weight": 4.2 },
+      { "ticker": "LRCX", "weight": 4.0 },
+      { "ticker": "ASML", "weight": 4.0 },
+      { "ticker": "KLAC", "weight": 3.8 },
+      { "ticker": "MU", "weight": 3.5 }
+    ]
+  },
+  "VGT": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "AAPL", "weight": 16.0 },
+      { "ticker": "MSFT", "weight": 15.0 },
+      { "ticker": "NVDA", "weight": 14.0 },
+      { "ticker": "AVGO", "weight": 5.0 },
+      { "ticker": "CRM", "weight": 2.3 },
+      { "ticker": "ORCL", "weight": 2.2 },
+      { "ticker": "ADBE", "weight": 2.0 },
+      { "ticker": "AMD", "weight": 1.8 },
+      { "ticker": "CSCO", "weight": 1.7 },
+      { "ticker": "ACN", "weight": 1.6 }
+    ]
+  },
+  "XLK": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "AAPL", "weight": 15.0 },
+      { "ticker": "MSFT", "weight": 13.0 },
+      { "ticker": "NVDA", "weight": 12.0 },
+      { "ticker": "AVGO", "weight": 5.0 },
+      { "ticker": "ORCL", "weight": 3.5 },
+      { "ticker": "CRM", "weight": 2.8 },
+      { "ticker": "ADBE", "weight": 2.2 },
+      { "ticker": "AMD", "weight": 2.0 },
+      { "ticker": "CSCO", "weight": 2.0 },
+      { "ticker": "QCOM", "weight": 1.8 }
+    ]
+  },
+  "XLF": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "BRK.B", "weight": 12.0 },
+      { "ticker": "JPM", "weight": 10.0 },
+      { "ticker": "V", "weight": 8.0 },
+      { "ticker": "MA", "weight": 7.0 },
+      { "ticker": "BAC", "weight": 5.0 },
+      { "ticker": "WFC", "weight": 4.5 },
+      { "ticker": "GS", "weight": 4.0 },
+      { "ticker": "MS", "weight": 3.8 },
+      { "ticker": "SPGI", "weight": 3.2 },
+      { "ticker": "AXP", "weight": 3.0 }
+    ]
+  },
+  "XLE": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "XOM", "weight": 22.0 },
+      { "ticker": "CVX", "weight": 16.0 },
+      { "ticker": "COP", "weight": 8.0 },
+      { "ticker": "WMB", "weight": 5.0 },
+      { "ticker": "EOG", "weight": 4.5 },
+      { "ticker": "SLB", "weight": 4.2 },
+      { "ticker": "MPC", "weight": 3.8 },
+      { "ticker": "PSX", "weight": 3.5 },
+      { "ticker": "OKE", "weight": 3.3 },
+      { "ticker": "KMI", "weight": 3.0 }
+    ]
+  },
+  "XLV": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "LLY", "weight": 12.0 },
+      { "ticker": "UNH", "weight": 9.0 },
+      { "ticker": "JNJ", "weight": 7.0 },
+      { "ticker": "ABBV", "weight": 6.5 },
+      { "ticker": "MRK", "weight": 4.5 },
+      { "ticker": "TMO", "weight": 3.8 },
+      { "ticker": "ABT", "weight": 3.5 },
+      { "ticker": "ISRG", "weight": 3.2 },
+      { "ticker": "PFE", "weight": 2.8 },
+      { "ticker": "DHR", "weight": 2.7 }
+    ]
+  },
+  "VIG": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "MSFT", "weight": 5.5 },
+      { "ticker": "AAPL", "weight": 4.8 },
+      { "ticker": "AVGO", "weight": 4.0 },
+      { "ticker": "JPM", "weight": 3.5 },
+      { "ticker": "V", "weight": 3.2 },
+      { "ticker": "PG", "weight": 2.8 },
+      { "ticker": "MA", "weight": 2.6 },
+      { "ticker": "COST", "weight": 2.4 },
+      { "ticker": "WMT", "weight": 2.2 },
+      { "ticker": "HD", "weight": 2.0 }
+    ]
+  },
+  "VTV": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "BRK.B", "weight": 3.5 },
+      { "ticker": "JPM", "weight": 3.0 },
+      { "ticker": "XOM", "weight": 2.8 },
+      { "ticker": "JNJ", "weight": 2.2 },
+      { "ticker": "PG", "weight": 2.0 },
+      { "ticker": "HD", "weight": 1.9 },
+      { "ticker": "ABBV", "weight": 1.8 },
+      { "ticker": "CVX", "weight": 1.7 },
+      { "ticker": "KO", "weight": 1.6 },
+      { "ticker": "WMT", "weight": 1.5 }
+    ]
+  },
+  "VUG": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "AAPL", "weight": 11.0 },
+      { "ticker": "MSFT", "weight": 10.5 },
+      { "ticker": "NVDA", "weight": 10.0 },
+      { "ticker": "AMZN", "weight": 6.0 },
+      { "ticker": "META", "weight": 4.0 },
+      { "ticker": "GOOGL", "weight": 3.5 },
+      { "ticker": "GOOG", "weight": 3.0 },
+      { "ticker": "AVGO", "weight": 3.0 },
+      { "ticker": "TSLA", "weight": 2.8 },
+      { "ticker": "LLY", "weight": 2.2 }
+    ]
+  },
+  "VNQ": {
+    "asOf": "2026-06",
+    "holdings": [
+      { "ticker": "PLD", "weight": 6.0 },
+      { "ticker": "AMT", "weight": 5.5 },
+      { "ticker": "EQIX", "weight": 5.2 },
+      { "ticker": "WELL", "weight": 4.5 },
+      { "ticker": "SPG", "weight": 3.8 },
+      { "ticker": "DLR", "weight": 3.5 },
+      { "ticker": "PSA", "weight": 3.2 },
+      { "ticker": "O", "weight": 3.0 },
+      { "ticker": "CCI", "weight": 2.8 },
+      { "ticker": "CBRE", "weight": 2.5 }
+    ]
+  },
+  "AGG": {
+    "asOf": "2026-06",
+    "holdings": [],
+    "note": "Broad US bond index — thousands of fixed-income holdings with no single-security concentration; overlap with equity positions is not modeled."
+  },
+  "BND": {
+    "asOf": "2026-06",
+    "holdings": [],
+    "note": "Broad US bond index — thousands of fixed-income holdings with no single-security concentration; overlap with equity positions is not modeled."
+  },
+  "GLD": {
+    "asOf": "2026-06",
+    "holdings": [],
+    "note": "Holds physical gold bullion, not securities — there is nothing for it to overlap with."
+  },
+  "IWM": {
+    "asOf": "2026-06",
+    "holdings": [],
+    "note": "Tracks ~2,000 small-cap stocks, each typically well under 1% of the fund — too diffuse for meaningful single-ticker overlap, and its constituents rarely match a typical large-cap portfolio."
+  },
+  "VEA": {
+    "asOf": "2026-06",
+    "holdings": [],
+    "note": "Developed-markets ex-US fund — holdings are non-US-listed tickers outside this app's ticker→sector map, so overlap with US-ticker positions isn't modeled."
+  },
+  "VXUS": {
+    "asOf": "2026-06",
+    "holdings": [],
+    "note": "Total international fund — holdings are non-US-listed tickers outside this app's ticker→sector map, so overlap with US-ticker positions isn't modeled."
+  },
+  "VWO": {
+    "asOf": "2026-06",
+    "holdings": [],
+    "note": "Emerging-markets fund — holdings are non-US-listed tickers outside this app's ticker→sector map, so overlap with US-ticker positions isn't modeled."
+  }
+}

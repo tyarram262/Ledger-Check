@@ -12,6 +12,7 @@ import { buildPositions, splitPricedTickers } from "@/lib/valuation";
 import SectorChart from "@/components/SectorChart";
 import DigestCard from "@/components/DigestCard";
 import RefreshPricesButton from "@/components/RefreshPricesButton";
+import HealthScoreCard from "@/components/HealthScoreCard";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,8 @@ export default async function DashboardPage() {
           <RefreshPricesButton />
         </div>
       </div>
+
+      <HealthScoreCard />
 
       <div
         className={`rounded-lg border px-5 py-4 text-base font-medium ${LEVEL_STYLES[verdict.level]}`}

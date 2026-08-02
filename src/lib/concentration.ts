@@ -24,8 +24,10 @@ export interface ConcentrationVerdict {
 export const DEFAULT_ELEVATED_THRESHOLD = 25;
 // "High" concentration kicks in well past "elevated" — scaled off the
 // user's configurable threshold so the two tiers stay proportional
-// (the shipped default of 25/40 is a 1.6x ratio).
-const HIGH_THRESHOLD_MULTIPLIER = 1.6;
+// (the shipped default of 25/40 is a 1.6x ratio). Exported so other
+// modules (e.g. the health-score engine) can derive the same "high"
+// cutoff without hardcoding a second copy of this ratio.
+export const HIGH_THRESHOLD_MULTIPLIER = 1.6;
 
 export function sectorAllocation(positions: Position[]): SectorSlice[] {
   // Accumulate before filtering: sells are modeled as negative adjustments

@@ -16,12 +16,21 @@ import {
 } from "@/lib/washSale";
 import { addDays } from "@/lib/dates";
 import { buildPositions } from "@/lib/valuation";
+import { computeOverlap, lookThroughPositions, type OverlapResult } from "@/lib/etfOverlap";
+import { checkTax, type TaxCheckResult } from "@/lib/taxCheck";
+import { diversificationScore, riskScore, type SubScore } from "@/lib/scores";
+import { DEFAULT_TAX_PROFILE, type TaxProfile } from "@/lib/taxRates";
 
 export type Severity = "ok" | "caution" | "warning";
 
 export interface AllocationSnapshot {
   slices: SectorSlice[];
   verdict: ConcentrationVerdict;
+}
+
+export interface ScoreDelta {
+  before: SubScore;
+  after: SubScore;
 }
 
 export interface SimulationResult {
@@ -37,6 +46,15 @@ export interface SimulationResult {
     avgCostPerShare: number;
     realizedGainLoss: number;
   } | null;
+  /** ETF look-through overlap for the traded ticker (Feature 1). */
+  etfOverlap: OverlapResult;
+  /** Wash-sale + holding-period + estimated-tax detail — sells only. */
+  taxCheck: TaxCheckResult | null;
+  /** Before/after diversification and risk sub-scores for this trade (Feature 1). */
+  scores: {
+    diversification: ScoreDelta;
+    risk: ScoreDelta;
+  };
 }
 
 export type SimulationOutcome =
@@ -54,7 +72,8 @@ export function simulateTrade(
   accounts: Account[],
   today: string,
   prices: Map<string, number> = new Map(),
-  elevatedThreshold: number = DEFAULT_ELEVATED_THRESHOLD
+  elevatedThreshold: number = DEFAULT_ELEVATED_THRESHOLD,
+  profile: TaxProfile = DEFAULT_TAX_PROFILE
 ): SimulationOutcome {
   const ticker = trade.ticker.toUpperCase();
   const sector = sectorFor(ticker);
@@ -149,6 +168,26 @@ export function simulateTrade(
       ? `Heads up: this sale realizes a loss. If you rebuy ${ticker} in any account before ${addDays(today, WASH_SALE_WINDOW_DAYS + 1)}, that loss would be disallowed as a wash sale.`
       : null;
 
+  const etfOverlap = computeOverlap(ticker, beforePositions, afterPositions);
+  const taxCheck = trade.side === "sell" ? checkTax(trade, lots, sales, accounts, profile, today) : null;
+
+  const scores = {
+    diversification: {
+      before: diversificationScore(lookThroughPositions(beforePositions), lots),
+      after: diversificationScore(lookThroughPositions(afterPositions), lots),
+    },
+    risk: {
+      before: riskScore(lookThroughPositions(beforePositions), before.slices),
+      after: riskScore(lookThroughPositions(afterPositions), after.slices),
+    },
+  };
+
+  // Escalate severity for tax signals that don't already show up as a wash
+  // sale or a concentration flag — a real short-term-gain tax hit deserves
+  // at least a caution even on an otherwise clean, well-diversified trade.
+  const finalSeverity: Severity =
+    severity === "ok" && taxCheck?.shortTermWarning ? "caution" : severity;
+
   return {
     ok: true,
     result: {
@@ -156,9 +195,12 @@ export function simulateTrade(
       after,
       washSale,
       verdictSentence,
-      severity,
+      severity: finalSeverity,
       futureRebuyNote,
       sellPreview,
+      etfOverlap,
+      taxCheck,
+      scores,
     },
   };
 }

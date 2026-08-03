@@ -9,6 +9,8 @@ import TickerHint from "@/components/TickerHint";
 import OverlapPanel from "@/components/OverlapPanel";
 import TaxCheckPanel from "@/components/TaxCheckPanel";
 import ScoreDeltaPanel from "@/components/ScoreDeltaPanel";
+import TradeReviewPanel from "@/components/TradeReviewPanel";
+import JournalPrompt, { type JournalPromptTarget } from "@/components/JournalPrompt";
 
 const SEVERITY_STYLES: Record<Severity, string> = {
   ok: "border-emerald-200 bg-emerald-50 text-emerald-800",
@@ -46,10 +48,13 @@ export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
   const [shares, setShares] = useState("");
   const [pricePerShare, setPricePerShare] = useState("");
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? 0);
+  const [rationale, setRationale] = useState("");
+  const [reviewText, setReviewText] = useState<string | null>(null);
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [recorded, setRecorded] = useState(false);
+  const [journalTarget, setJournalTarget] = useState<JournalPromptTarget | null>(null);
 
   const tradePayload = {
     side,
@@ -64,6 +69,7 @@ export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
     setPending(true);
     setError(null);
     setRecorded(false);
+    setReviewText(null);
     const res = await fetch("/api/simulate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -88,12 +94,24 @@ export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
       body: JSON.stringify(tradePayload),
     });
     setPending(false);
+    const body = await res.json().catch(() => null);
     if (!res.ok) {
-      const body = await res.json().catch(() => null);
       setError(body?.error ?? "Something went wrong.");
       return;
     }
     setRecorded(true);
+    // Sells return no lotId — nothing to journal. Snapshot the trade's own
+    // values now: `setResult(null)` below unmounts the result panel, so
+    // the journal prompt (rendered outside it) needs its own copy.
+    if (body?.lotId) {
+      setJournalTarget({
+        lotId: body.lotId,
+        ticker: ticker.toUpperCase(),
+        shares: Number(shares),
+        costPerShare: Number(pricePerShare),
+        purchaseDate: new Date().toISOString().slice(0, 10),
+      });
+    }
     setResult(null);
     router.refresh();
   }
@@ -168,6 +186,18 @@ export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
         <div className="mt-2">
           <TickerHint ticker={ticker} />
         </div>
+        <label className="mt-3 flex flex-col gap-1 text-sm">
+          <span className="text-slate-600">
+            Why are you making this trade? (optional — used only for the AI second opinion below)
+          </span>
+          <textarea
+            value={rationale}
+            onChange={(e) => setRationale(e.target.value)}
+            rows={2}
+            placeholder="e.g. Long-term growth conviction, diversifying out of tech, rebalancing…"
+            className="rounded border border-slate-300 px-2 py-1.5"
+          />
+        </label>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
         {recorded && (
           <p className="mt-2 text-sm text-emerald-600">
@@ -266,6 +296,12 @@ export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
 
           {result.taxCheck && <TaxCheckPanel taxCheck={result.taxCheck} />}
 
+          <TradeReviewPanel
+            tradePayload={tradePayload}
+            rationale={rationale}
+            onReview={setReviewText}
+          />
+
           <section className="rounded-lg border border-slate-200 bg-white p-5">
             <h3 className="text-base font-semibold">
               Sector allocation: before → after
@@ -321,6 +357,16 @@ export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
             {pending ? "Recording…" : "I made this trade — record it"}
           </button>
         </div>
+      )}
+
+      {journalTarget && (
+        <JournalPrompt
+          target={journalTarget}
+          defaultReason={rationale}
+          aiReview={reviewText}
+          source="simulator"
+          onDone={() => setJournalTarget(null)}
+        />
       )}
     </div>
   );

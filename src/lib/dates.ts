@@ -15,6 +15,19 @@ export function addDays(iso: string, days: number): string {
   return toIsoDate(d);
 }
 
+/** Adds calendar months (not a days-per-month approximation). Rolling past
+ *  a shorter month clamps to that month's last day (e.g. Jan 31 + 1 month
+ *  -> Feb 28/29, not Mar 3), matching `Date`'s UTC month-arithmetic behavior. */
+export function addMonths(iso: string, months: number): string {
+  const d = parseIsoDate(iso);
+  const day = d.getUTCDate();
+  d.setUTCDate(1); // avoid month-end overflow while shifting the month
+  d.setUTCMonth(d.getUTCMonth() + months);
+  const lastDayOfMonth = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDayOfMonth));
+  return toIsoDate(d);
+}
+
 /** Whole days from `from` to `to` (positive when `to` is later). */
 export function daysBetween(from: string, to: string): number {
   const ms = parseIsoDate(to).getTime() - parseIsoDate(from).getTime();

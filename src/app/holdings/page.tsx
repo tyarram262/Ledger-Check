@@ -1,4 +1,4 @@
-import { listAccounts, listLots, listSales } from "@/lib/queries";
+import { listAccounts, listJournalEntries, listLots, listSales } from "@/lib/queries";
 import AccountForm from "@/components/AccountForm";
 import AccountCashEditor from "@/components/AccountCashEditor";
 import LotForm from "@/components/LotForm";
@@ -13,6 +13,7 @@ export default async function HoldingsPage() {
   const accounts = await listAccounts();
   const lots = await listLots();
   const sales = await listSales();
+  const journalEntries = await listJournalEntries();
 
   return (
     <div className="space-y-8">
@@ -50,7 +51,7 @@ export default async function HoldingsPage() {
           <CsvImport accounts={accounts} />
         </div>
         <div className="mt-6">
-          <HoldingsTable lots={lots} />
+          <HoldingsTable lots={lots} entries={journalEntries} />
         </div>
       </section>
 

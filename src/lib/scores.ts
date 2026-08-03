@@ -293,12 +293,18 @@ export function cashAllocationScore(cash: number, totalValue: number): SubScore 
   return { key: "cashAllocation", label: "Cash allocation", score, grade: gradeFor(score), sentence };
 }
 
-/** Per-trade risk score (Feature 1, not part of the persisted daily health
- *  score): the larger of single-position or single-sector concentration
- *  risk, on the same "higher is healthier" 0-100 scale as every other
- *  sub-score. Complements `diversificationScore` — a portfolio can be
- *  well-diversified by name count and still carry concentrated risk if one
- *  name or sector dominates the dollars. */
+/** Risk score, used both per-trade (Feature 1, before/after in
+ *  `simulate.ts`) and as the 6th daily health sub-score (Feature 3, via
+ *  `portfolioHealth` below): the larger of single-position or
+ *  single-sector concentration risk, on the same "higher is healthier"
+ *  0-100 scale as every other sub-score. Complements `diversificationScore`
+ *  — a portfolio can be well-diversified by name count and still carry
+ *  concentrated risk if one name or sector dominates the dollars. Note:
+ *  this deliberately overlaps with `concentrationScore` (sector axis) and
+ *  `diversificationScore` (position axis) — a concentrated portfolio is
+ *  meant to be penalized on more than one axis, not double-counted by
+ *  accident. `HEALTH_SCORE_WEIGHTS` reflects this on purpose; don't
+ *  "fix" the overlap by removing risk from one or the other. */
 export function riskScore(lookThrough: Position[], slices: SectorSlice[]): SubScore {
   const total = lookThrough.reduce((sum, p) => sum + Math.max(0, p.value), 0);
   if (total <= 0) {
@@ -319,16 +325,23 @@ export function riskScore(lookThrough: Position[], slices: SectorSlice[]): SubSc
   return { key: "risk", label: "Risk", score, grade: gradeFor(score), sentence };
 }
 
-export const HEALTH_SCORE_WEIGHTS = {
-  diversification: 25,
-  concentration: 25,
-  sectorBalance: 20,
+export const HEALTH_SCORE_WEIGHTS: Record<string, number> = {
+  diversification: 20,
+  concentration: 20,
+  sectorBalance: 15,
   taxEfficiency: 20,
   cashAllocation: 10,
-} as const;
+  risk: 15,
+};
+
+// Weights are expressed as whole numbers for readability (they happen to
+// sum to 100 today), but `overall` is computed as a proper weighted mean —
+// dividing by this computed total rather than a hardcoded 100 — so a future
+// rebalance can't silently break the math the way a literal divisor would.
+const HEALTH_WEIGHT_TOTAL = Object.values(HEALTH_SCORE_WEIGHTS).reduce((a, b) => a + b, 0);
 
 /** The daily Portfolio Health Score (Feature 3) — a weighted mean of the
- *  five sub-scores above, persisted once per day in `health_snapshots`. */
+ *  six sub-scores above, persisted once per day in `health_snapshots`. */
 export function portfolioHealth(
   lookThrough: Position[],
   slices: SectorSlice[],
@@ -343,18 +356,15 @@ export function portfolioHealth(
 ): HealthScore {
   const diversification = diversificationScore(lookThrough, lots);
   const concentration = concentrationScore(slices, threshold);
+  const risk = riskScore(lookThrough, slices);
   const sectorBalance = sectorBalanceScore(slices);
   const taxEfficiency = taxEfficiencyScore(lots, prices, accounts, profile, today);
   const cashAllocation = cashAllocationScore(cash, totalValue);
 
-  const subScores = [diversification, concentration, sectorBalance, taxEfficiency, cashAllocation];
+  const subScores = [diversification, concentration, risk, sectorBalance, taxEfficiency, cashAllocation];
   const overall =
-    (diversification.score * HEALTH_SCORE_WEIGHTS.diversification +
-      concentration.score * HEALTH_SCORE_WEIGHTS.concentration +
-      sectorBalance.score * HEALTH_SCORE_WEIGHTS.sectorBalance +
-      taxEfficiency.score * HEALTH_SCORE_WEIGHTS.taxEfficiency +
-      cashAllocation.score * HEALTH_SCORE_WEIGHTS.cashAllocation) /
-    100;
+    subScores.reduce((sum, s) => sum + s.score * (HEALTH_SCORE_WEIGHTS[s.key] ?? 0), 0) /
+    HEALTH_WEIGHT_TOTAL;
 
   return { overall, overallGrade: gradeFor(overall), subScores, computedAt: today };
 }

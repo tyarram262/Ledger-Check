@@ -2,7 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createLot } from "@/lib/queries";
 import type { SimulatedTrade } from "@/lib/washSale";
 
-export type RecordOutcome = { ok: true } | { ok: false; error: string };
+export type RecordOutcome =
+  | { ok: true; lotId?: number } // lotId present for buys only
+  | { ok: false; error: string };
 
 /** Persist a simulated trade as real: buys add a lot; sells consume lots
  *  FIFO within the account (atomically, via the record_sell DB function)
@@ -14,14 +16,14 @@ export async function recordTrade(
   const ticker = trade.ticker.toUpperCase();
 
   if (trade.side === "buy") {
-    await createLot({
+    const lotId = await createLot({
       accountId: trade.accountId,
       ticker,
       shares: trade.shares,
       costPerShare: trade.pricePerShare,
       purchaseDate: today,
     });
-    return { ok: true };
+    return { ok: true, lotId };
   }
 
   const supabase = await createClient();

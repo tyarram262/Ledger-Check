@@ -71,6 +71,7 @@ export async function computeAndPersistHealth(): Promise<HealthResult> {
     concentration: byKey.concentration,
     sectorBalance: byKey.sectorBalance,
     cashAllocation: byKey.cashAllocation,
+    risk: byKey.risk,
   });
 
   const history = await listHealthSnapshots(30);

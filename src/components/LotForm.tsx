@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Account } from "@/lib/types";
 import TickerHint from "@/components/TickerHint";
+import JournalPrompt, { type JournalPromptTarget } from "@/components/JournalPrompt";
 
 export default function LotForm({ accounts }: { accounts: Account[] }) {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function LotForm({ accounts }: { accounts: Account[] }) {
   const [purchaseDate, setPurchaseDate] = useState(today);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [journalTarget, setJournalTarget] = useState<JournalPromptTarget | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,11 +34,20 @@ export default function LotForm({ accounts }: { accounts: Account[] }) {
       }),
     });
     setPending(false);
+    const body = await res.json().catch(() => null);
     if (!res.ok) {
-      const body = await res.json().catch(() => null);
       setError(body?.error ?? "Something went wrong.");
       return;
     }
+    // Snapshot the entered values before clearing them — the journal
+    // prompt's header needs them after the form resets.
+    setJournalTarget({
+      lotId: body.id,
+      ticker: ticker.toUpperCase(),
+      shares: Number(shares),
+      costPerShare: Number(costPerShare),
+      purchaseDate,
+    });
     setTicker("");
     setShares("");
     setCostPerShare("");
@@ -44,8 +55,9 @@ export default function LotForm({ accounts }: { accounts: Account[] }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+    <div className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-slate-600">Account</span>
           <select
@@ -117,6 +129,14 @@ export default function LotForm({ accounts }: { accounts: Account[] }) {
       >
         {pending ? "Adding…" : "Add holding"}
       </button>
-    </form>
+      </form>
+      {journalTarget && (
+        <JournalPrompt
+          target={journalTarget}
+          source="manual"
+          onDone={() => setJournalTarget(null)}
+        />
+      )}
+    </div>
   );
 }

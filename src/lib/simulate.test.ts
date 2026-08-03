@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { simulateTrade } from "@/lib/simulate";
 import { makeLot, makeSale } from "@/lib/testFixtures";
 import type { Account } from "@/lib/types";
+import { DEFAULT_TAX_PROFILE, type TaxProfile } from "@/lib/taxRates";
 
 const TODAY = "2026-07-03";
 
@@ -208,5 +209,35 @@ describe("simulateTrade — sells", () => {
     );
     expect(outcome.ok).toBe(false);
     if (!outcome.ok) expect(outcome.error).toContain("only hold 100 shares");
+  });
+});
+
+describe("simulateTrade — tax profile flows through to the tax check", () => {
+  it("changes the estimated tax when a non-default profile is passed (regression: /api/simulate once silently ignored the user's tax profile)", () => {
+    const lots = [
+      makeLot({ ticker: "NVDA", shares: 10, costPerShare: 100, purchaseDate: "2026-06-01", accountId: 1 }),
+    ];
+    const trade = {
+      side: "sell" as const,
+      ticker: "NVDA",
+      shares: 10,
+      pricePerShare: 200,
+      accountId: 1,
+    };
+
+    const defaultOutcome = simulateTrade(trade, lots, [], ACCOUNTS, TODAY, new Map(), 25, DEFAULT_TAX_PROFILE);
+    const highIncomeProfile: TaxProfile = {
+      filingStatus: "single",
+      annualTaxableIncome: 600_000,
+      stateTaxRate: 9,
+    };
+    const highIncomeOutcome = simulateTrade(trade, lots, [], ACCOUNTS, TODAY, new Map(), 25, highIncomeProfile);
+
+    if (!defaultOutcome.ok || !highIncomeOutcome.ok) {
+      throw new Error("expected both simulations to succeed");
+    }
+    const defaultTax = defaultOutcome.result.taxCheck?.estimatedTax.total ?? 0;
+    const highIncomeTax = highIncomeOutcome.result.taxCheck?.estimatedTax.total ?? 0;
+    expect(highIncomeTax).toBeGreaterThan(defaultTax);
   });
 });

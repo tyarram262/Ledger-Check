@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Account, AccountType, Lot, Sale } from "@/lib/types";
 import type { FilingStatus } from "@/lib/taxRates";
+import { horizonReviewDate, type JournalEntry, type TimeHorizon } from "@/lib/journal";
 
 interface AccountRow {
   id: number;
@@ -289,6 +290,9 @@ export interface HealthSnapshotRow {
   concentration: number;
   sectorBalance: number;
   cashAllocation: number;
+  /** Added 2026-08 — nullable because pre-existing snapshot rows can't be
+   *  backfilled (no historical look-through to recompute risk from). */
+  risk: number | null;
 }
 
 /** One row per user per day — a second write on the same day updates the
@@ -304,6 +308,7 @@ export async function upsertHealthSnapshot(row: HealthSnapshotRow): Promise<void
       concentration: row.concentration,
       sector_balance: row.sectorBalance,
       cash_allocation: row.cashAllocation,
+      risk: row.risk,
     },
     { onConflict: "user_id,snapshot_date" }
   );
@@ -314,7 +319,7 @@ export async function listHealthSnapshots(limit = 30): Promise<HealthSnapshotRow
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("health_snapshots")
-    .select("snapshot_date, overall, diversification, tax_efficiency, concentration, sector_balance, cash_allocation")
+    .select("snapshot_date, overall, diversification, tax_efficiency, concentration, sector_balance, cash_allocation, risk")
     .order("snapshot_date", { ascending: false })
     .limit(limit);
   if (error) throw new Error(error.message);
@@ -327,6 +332,115 @@ export async function listHealthSnapshots(limit = 30): Promise<HealthSnapshotRow
       concentration: r.concentration,
       sectorBalance: r.sector_balance,
       cashAllocation: r.cash_allocation,
+      risk: r.risk ?? null,
     }))
     .reverse(); // ascending (oldest first), for a left-to-right sparkline
+}
+
+interface JournalEntryRow {
+  id: number;
+  lot_id: number | null;
+  ticker: string;
+  account_id: number | null;
+  shares: number | null;
+  cost_per_share: number | null;
+  purchase_date: string;
+  reason: string;
+  time_horizon: TimeHorizon;
+  horizon_review_date: string | null;
+  sell_trigger: string | null;
+  risks: string | null;
+  ai_review: string | null;
+  source: "manual" | "simulator";
+  created_at: string;
+}
+
+function mapJournalEntry(r: JournalEntryRow): JournalEntry {
+  return {
+    id: r.id,
+    lotId: r.lot_id,
+    ticker: r.ticker,
+    accountId: r.account_id,
+    shares: r.shares,
+    costPerShare: r.cost_per_share,
+    purchaseDate: r.purchase_date,
+    reason: r.reason,
+    timeHorizon: r.time_horizon,
+    horizonReviewDate: r.horizon_review_date,
+    sellTrigger: r.sell_trigger,
+    risks: r.risks,
+    aiReview: r.ai_review,
+    source: r.source,
+    createdAt: r.created_at,
+  };
+}
+
+const JOURNAL_ENTRY_SELECT =
+  "id, lot_id, ticker, account_id, shares, cost_per_share, purchase_date, reason, time_horizon, horizon_review_date, sell_trigger, risks, ai_review, source, created_at";
+
+/** Creates (or, via the `lot_id` upsert, replaces) a journal entry for a
+ *  lot the caller owns. `horizon_review_date` is computed here from
+ *  `timeHorizon`, not passed in, so the label/duration mapping lives in
+ *  exactly one place (`journal.ts`). */
+export async function createJournalEntry(input: {
+  lotId: number;
+  ticker: string;
+  accountId: number;
+  shares: number;
+  costPerShare: number;
+  purchaseDate: string;
+  reason: string;
+  timeHorizon: TimeHorizon;
+  sellTrigger?: string | null;
+  risks?: string | null;
+  aiReview?: string | null;
+  source: "manual" | "simulator";
+}): Promise<number> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("journal_entries")
+    .upsert(
+      {
+        lot_id: input.lotId,
+        ticker: input.ticker.toUpperCase(),
+        account_id: input.accountId,
+        shares: input.shares,
+        cost_per_share: input.costPerShare,
+        purchase_date: input.purchaseDate,
+        reason: input.reason,
+        time_horizon: input.timeHorizon,
+        horizon_review_date: horizonReviewDate(input.purchaseDate, input.timeHorizon),
+        sell_trigger: input.sellTrigger ?? null,
+        risks: input.risks ?? null,
+        ai_review: input.aiReview ?? null,
+        source: input.source,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "lot_id" }
+    )
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return data.id;
+}
+
+export async function listJournalEntries(): Promise<JournalEntry[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("journal_entries")
+    .select(JOURNAL_ENTRY_SELECT)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data as unknown as JournalEntryRow[]).map(mapJournalEntry);
+}
+
+export async function deleteJournalEntry(id: number): Promise<boolean> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("journal_entries")
+    .delete()
+    .eq("id", id)
+    .select("id");
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
 }

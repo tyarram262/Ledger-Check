@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, daysBetween } from "@/lib/dates";
+import { addDays, addMonths, daysBetween } from "@/lib/dates";
 
 describe("addDays", () => {
   it("crosses month boundaries", () => {
@@ -17,6 +17,24 @@ describe("addDays", () => {
 
   it("computes the 31-day wash-sale clear date", () => {
     expect(addDays("2026-06-23", 31)).toBe("2026-07-24");
+  });
+});
+
+describe("addMonths", () => {
+  it("crosses year boundaries", () => {
+    expect(addMonths("2026-11-15", 3)).toBe("2027-02-15");
+  });
+
+  it("clamps to the shorter month's last day instead of overflowing", () => {
+    expect(addMonths("2026-01-31", 1)).toBe("2026-02-28");
+  });
+
+  it("clamps to Feb 29 on a leap year", () => {
+    expect(addMonths("2024-01-31", 1)).toBe("2024-02-29");
+  });
+
+  it("adds a decade cleanly", () => {
+    expect(addMonths("2026-08-02", 120)).toBe("2036-08-02");
   });
 });
 

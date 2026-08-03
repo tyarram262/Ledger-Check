@@ -204,7 +204,7 @@ describe("riskScore", () => {
 });
 
 describe("portfolioHealth", () => {
-  it("computes the overall score as the documented weighted mean of the five sub-scores", () => {
+  it("computes the overall score as the documented weighted mean of the six sub-scores", () => {
     const lots: Lot[] = [
       makeLot({ ticker: "VOO", shares: 100, costPerShare: 400, purchaseDate: "2023-01-01", accountId: 1 }),
       makeLot({ ticker: "AAPL", shares: 10, costPerShare: 150, purchaseDate: "2026-06-01", accountId: 1 }),
@@ -230,20 +230,22 @@ describe("portfolioHealth", () => {
       TODAY
     );
 
-    expect(health.subScores).toHaveLength(5);
+    expect(health.subScores).toHaveLength(6);
     const byKey = Object.fromEntries(health.subScores.map((s) => [s.key, s.score]));
+    const weightTotal = Object.values(HEALTH_SCORE_WEIGHTS).reduce((a, b) => a + b, 0);
     const expectedOverall =
       (byKey.diversification * HEALTH_SCORE_WEIGHTS.diversification +
         byKey.concentration * HEALTH_SCORE_WEIGHTS.concentration +
+        byKey.risk * HEALTH_SCORE_WEIGHTS.risk +
         byKey.sectorBalance * HEALTH_SCORE_WEIGHTS.sectorBalance +
         byKey.taxEfficiency * HEALTH_SCORE_WEIGHTS.taxEfficiency +
         byKey.cashAllocation * HEALTH_SCORE_WEIGHTS.cashAllocation) /
-      100;
+      weightTotal;
     expect(health.overall).toBeCloseTo(expectedOverall, 5);
     expect(health.overallGrade).toBe(gradeFor(health.overall));
   });
 
-  it("weights sum to 100", () => {
+  it("weights sum to 100 (a readability convention, not a correctness dependency — `overall` divides by the computed total)", () => {
     const total = Object.values(HEALTH_SCORE_WEIGHTS).reduce((a, b) => a + b, 0);
     expect(total).toBe(100);
   });

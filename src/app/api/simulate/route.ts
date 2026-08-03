@@ -1,46 +1,14 @@
 import { NextResponse } from "next/server";
-import {
-  getConcentrationThreshold,
-  listAccounts,
-  listLots,
-  listSales,
-} from "@/lib/queries";
-import { simulateTrade } from "@/lib/simulate";
-import { todayIso } from "@/lib/dates";
-import { getStoredQuotes, toPriceMap } from "@/lib/quotes";
+import { parseTradeBody, runSimulation } from "@/lib/tradeContext";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  const side = body?.side;
-  const ticker = typeof body?.ticker === "string" ? body.ticker.trim() : "";
-  const shares = Number(body?.shares);
-  const pricePerShare = Number(body?.pricePerShare);
-  const accountId = body?.accountId ? Number(body.accountId) : undefined;
-
-  const errors: string[] = [];
-  if (side !== "buy" && side !== "sell") errors.push("Side must be buy or sell.");
-  if (!/^[A-Za-z.\-]{1,10}$/.test(ticker)) errors.push("Invalid ticker.");
-  if (!Number.isFinite(shares) || shares <= 0)
-    errors.push("Shares must be a positive number.");
-  if (!Number.isFinite(pricePerShare) || pricePerShare <= 0)
-    errors.push("Price must be a positive number.");
-  if (errors.length > 0) {
-    return NextResponse.json({ error: errors.join(" ") }, { status: 400 });
+  const parsed = parseTradeBody(body);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.errors.join(" ") }, { status: 400 });
   }
 
-  const lots = await listLots();
-  const prices = toPriceMap(
-    await getStoredQuotes([...new Set(lots.map((l) => l.ticker))])
-  );
-  const outcome = simulateTrade(
-    { side, ticker, shares, pricePerShare, accountId },
-    lots,
-    await listSales(),
-    await listAccounts(),
-    todayIso(),
-    prices,
-    await getConcentrationThreshold()
-  );
+  const outcome = await runSimulation(parsed.trade);
   if (!outcome.ok) {
     return NextResponse.json({ error: outcome.error }, { status: 400 });
   }

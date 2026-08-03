@@ -1,5 +1,5 @@
 @AGENTS.md
-# Session handoff — READ THIS FIRST (updated 2026-08-02)
+# Session handoff — READ THIS FIRST (updated 2026-08-02, evening)
 
 Two layers below this one: **"Mission & how to work here"** (the north
 star — how to think about features and write code in this repo) and
@@ -74,41 +74,62 @@ not checked into the repo. Inspect it live (`mcp__supabase__list_tables` /
   Redirect URLs needs both the localhost and prod `/auth/confirm` URLs.
   No MCP tool covers Auth/SMTP config — dashboard-only, user must do it.
 
-## What's built vs. the MVP (current numbering, 2026-08-02)
+## What's built vs. the mission doc's MVP (5 features + AI Trade Review)
 
-Portfolio Import is the foundation everything else sits on, not one of the
-"5" below anymore — it's done and unremarkable enough to not need its own
-slot. The 5 features are now Trade Check / Tax Check / Portfolio Health /
-AI Trade Review / Investment Journal, in build order — see "MVP scope"
-below for the full spec each row is measured against.
-
-| Feature | Status | Notes / gap |
+| Feature (mission doc) | Status | Notes / gap |
 |---|---|---|
-| **Portfolio Import** (prerequisite) | Done | CSV + manual entry (`/holdings`, `csvImport.ts`). No `BrokerageProvider` abstraction yet — `queries.ts` talks to Supabase directly. Natural point to add it: Phase 2 (SnapTrade) below, not before. |
-| **1. Trade Check** | Live | Concentration, sector, ETF overlap, diversification score, risk score, overall trade-health score all live (`/simulate`, `simulate.ts`, `etfOverlap.ts`, `scores.ts`). Missing: estimated volatility impact (no return-series data source), position sizing, behavioral warnings. |
-| **2. Tax Check** | Live | Wash-sale warning, short-term gain warning, long-term gain countdown, estimated tax all live (`washSale.ts`, `holdingPeriod.ts`, `taxCheck.ts`). Lot selection is FIFO-only (explicitly "future" scope). Every tax figure labeled "estimate only." |
-| **3. Portfolio Health Score** | Live | 5 of 6 sub-scores live and daily-persisted (`scores.ts`, `/api/health`): Diversification, Concentration, Sector Balance, Tax Efficiency, Cash Allocation → overall A–F grade. Risk exists only as a per-trade score in Trade Check, not a 6th daily sub-score — small follow-up (`riskScore` → `computeAndPersistHealth`). **No sub-score renders an actionable recommendation yet**, only a descriptive sentence. |
-| **4. AI Trade Review** | Not started | The one real gap in the v1 spec. Needs a new interactive Claude prompt pattern ("explain why this trade may be a mistake," "challenge my reasoning") — an intelligent devil's-advocate reviewer for a specific proposed trade, distinct from `digest.ts`'s passive whole-portfolio summary. Natural implementation: a new endpoint (e.g. `/api/trade-review`) that feeds the same context `simulateTrade` already assembles (before/after allocation, wash-sale/tax-check results, overlap) into a Claude call, surfaced as a button on `/simulate` next to the deterministic panels. Reuses the existing `@anthropic-ai/sdk` wiring from `digest.ts` — cheap to build. |
-| **5. Investment Journal** | Not started | Needs a new RLS-scoped table + a prompt step in the buy flow (`LotForm.tsx`) + surfacing back in `HoldingsTable.tsx`. **Real gap in the ask:** the payoff example ("you said you wouldn't sell unless revenue growth slowed below 15%; it's still 24%") needs *fundamentals* data (revenue growth) that nothing in this app fetches — `quotes.ts` only stores a current price, no return series or fundamentals. Build v1 reminders on what's actually checkable now (price moved X% since purchase, N months elapsed, allocation drifted) and defer fundamentals-based callbacks until a fundamentals data source exists — don't promise the revenue-growth example before that's true. |
+| **1. Portfolio Import** | CSV + manual entry done (`/holdings`, `csvImport.ts`) | No `BrokerageProvider` abstraction yet — `queries.ts` talks to Supabase directly. Natural point to add it: Phase 2 (SnapTrade) below, not before. |
+| **2. Trade Check** | Concentration, sector, ETF overlap, diversification/risk score deltas, overall verdict all live (`/simulate`, `simulate.ts`, `etfOverlap.ts`, `scores.ts`) | Missing: estimated volatility impact (no return-series data source), position sizing, behavioral warnings. |
+| **3. Tax Check** | Wash sale, short/long-term gains, long-term countdown, estimated realized gain/loss all live (`washSale.ts`, `holdingPeriod.ts`, `taxCheck.ts`) | Lot selection is FIFO-only (matches "future" scope in mission doc). Every tax figure is labeled "estimate only." |
+| **4. Portfolio Health** | **All 6 sub-scores live and daily-persisted** (`scores.ts`, `/api/health`): Diversification, Concentration, Risk, Sector Balance, Tax Efficiency, Cash Allocation | **No sub-score renders an actionable recommendation yet**, only a descriptive sentence — needs a product call on how prescriptive to get without crossing into "AI makes buy/sell decisions." |
+| **5. Investment Journal** | **Live** (capture + display only — see below for explicit v1 scope) | Prompted after a real buy (`LotForm.tsx`, `TradeSimulator.tsx`'s record flow); shown inline per lot in `HoldingsTable.tsx`. Not built: dashboard-level nudges, editing an entry, feeding it into the digest. |
+| **AI Trade Review** (new in the expanded mission doc, not in the original 5) | **Live** — on-demand "second opinion" on `/simulate`, a devil's-advocate critique, never a buy/sell call | Stateless (no cache table); reuses the deterministic `SimulationResult` the trade-check panels already show, never computes anything itself. |
 
-Trade Check / Tax Check / Portfolio Health shipped 2026-08-02: ETF
-look-through overlap (`etfOverlap.ts` + `src/data/etf-holdings.json`,
-static top-holdings snapshot for 24 ETFs — flags near-duplicate funds and
-"true" exposure through funds you hold), a long-term-gain countdown
-("wait N days, save ~$X" — no broker surfaces this), and IRA sells
-returning **zeroed tax figures with an explanation, never a fabricated
-number**. Tax efficiency is computed from **unrealized** lot data only —
-`sales` has no acquisition date, so realized short/long-term can't be
-reconstructed without a schema + `record_sell` change. Schema additions:
+**This session (2026-08-02 evening) added:** AI Trade Review
+(`tradeReview.ts` + `/api/trade-review` + `TradeReviewPanel.tsx`, mirrors
+`digest.ts`'s Claude-call shape but stateless); Investment Journal
+(`journal.ts` + `journal_entries` table + `JournalPrompt.tsx` +
+`JournalEntryDetail.tsx`); Risk as the 6th daily health sub-score
+(`riskScore` now called from `computeAndPersistHealth`, weights
+rebalanced, `health_snapshots.risk` nullable column). Also fixed a real
+bug found while wiring this: **`/api/simulate` never fetched the user's
+tax profile from `/settings`**, so every Tax Check estimate silently used
+the single-filer/$0-income default regardless of what was configured —
+fixed via a new shared `tradeContext.ts` (`parseTradeBody` +
+`runSimulation`) that both `/api/simulate` and `/api/trade-review` now
+call, so this can't drift out of sync between routes again.
+
+**Investment Journal's schema constraint, worth knowing before touching
+it:** `record_sell` hard-deletes a lot once fully consumed by a sell
+(confirmed by reading the live function body), and the Remove button
+hard-deletes on request. `journal_entries.lot_id` uses `on delete set
+null` (not a plain FK, not cascade) plus denormalized
+ticker/account/shares/cost/purchase-date snapshot columns, so an entry
+survives its lot's lifecycle instead of either breaking the sell or
+being destroyed exactly when it becomes most valuable. Verified directly
+against the live DB (a scratch insert + full-lot-delete + check, then
+cleaned up) before shipping — see git history for the exact `execute_sql`
+transcript if this ever needs re-verifying.
+
+**Trade Check / Tax Check / Portfolio Health** (shipped earlier the same
+day): ETF look-through overlap (`etfOverlap.ts` +
+`src/data/etf-holdings.json`, static top-holdings snapshot for 24 ETFs —
+flags near-duplicate funds and "true" exposure through funds you hold),
+and IRA sells returning **zeroed tax figures with an explanation, never a
+fabricated number**. Tax efficiency is computed from **unrealized** lot
+data only — `sales` has no acquisition date, so realized short/long-term
+can't be reconstructed without a schema + `record_sell` change. Schema:
 `accounts.cash_balance`, `settings.{filing_status,annual_taxable_income,
-state_tax_rate}`, `health_snapshots` (migration
-`mvp_cash_tax_profile_health`).
+state_tax_rate}`, `health_snapshots` (migrations
+`mvp_cash_tax_profile_health`, `health_snapshots_risk`, `journal_entries`,
+`journal_entries_account_id_idx`).
 
 The AI-philosophy example sentences below ("You already own similar
 exposure through QQQ") are **already produced deterministically**, not by
 an LLM — `etfOverlap.ts` and `concentration.ts` generate near-verbatim
-variants. `digest.ts` is the one actual AI call in the app and only
-narrates numbers computed elsewhere.
+variants. `digest.ts` and `tradeReview.ts` are the only two places that
+actually call Claude, and both only narrate/critique numbers computed
+elsewhere — never compute anything themselves.
 
 ## Verification log
 
@@ -119,15 +140,36 @@ settings, quote refresh, digest), wash-sale engine checked against real
 DB-backed data (IRA-permanent, deferred cross-account, correctly-not-
 flagged, both buy-after-loss flavors). `tsc`/`eslint`/50 tests clean.
 
-**MVP features (2026-08-02): unit-tested, not yet browser-verified.** 131
-tests passing (117 new), `tsc`/`eslint`/`next build` clean, Supabase
+**MVP features (2026-08-02, morning): unit-tested, not yet browser-verified.**
+131 tests passing (117 new), `tsc`/`eslint`/`next build` clean, Supabase
 advisors clean, prod curl-verified live (`/` → 307 to `/login`, `/login`
-→ 200). **No authenticated click-through was possible this session** (no
-stored browser session, no inbox access for the magic-link email).
-**Next person: sign in as `tanush.yarram@gmail.com` and click through the
-health score, the trade-check panels, the tax-check panel (incl. the IRA
-zero-tax case), and the settings tax-profile form before trusting the UI
-layer** — logic is solid, rendering hasn't been looked at with real eyes.
+→ 200).
+
+**AI Trade Review / Investment Journal / Risk sub-score (2026-08-02,
+evening): unit-tested + DB-verified, not yet browser-verified.** 146
+tests passing (15 new — `addMonths` boundary cases, `journal.ts`'s
+horizon math, the tax-profile regression test), `tsc`/`eslint`/`next
+build` clean, Supabase advisors clean. Went further than the morning
+session on DB-level verification specifically because this slice touched
+`ON DELETE` semantics: ran a real insert → full-lot-delete → check → clean
+up against the live database (not just local `npm run dev`) to confirm
+`journal_entries.lot_id` survives as NULL rather than erroring or
+cascading, and curl-smoke-tested that `/api/journal`, `/api/trade-review`,
+and `/api/health` all correctly 307-redirect when unauthenticated, same as
+every existing route.
+
+**No authenticated click-through was possible either session** (no stored
+browser session, no inbox access for the magic-link email — this is a
+standing limitation of the environment these sessions run in, not
+something that's been tried and failed). **Next person: sign in as
+`tanush.yarram@gmail.com` and click through the health score (now 6
+sub-scores), the trade-check panels (incl. the new "AI second opinion"
+button and the rationale textarea), the tax-check panel (incl. the IRA
+zero-tax case), the settings tax-profile form, and the journal prompt on
+both a manual buy and a recorded simulator trade (incl. the Skip button on
+each) before trusting the UI layer** — logic is solid and the one DB
+constraint that mattered has been verified directly, but rendering and
+interaction flow haven't been looked at with real eyes.
 
 Demo data exists under `tanush.yarram@gmail.com` (**use this one** — the
 only address Resend's sandbox can currently email) and, separately, an
@@ -214,102 +256,34 @@ score/warning — `washSale.ts`, `taxCheck.ts`, `scores.ts`,
 `etfOverlap.ts` — is deterministic; `digest.ts` is the only AI call and
 only narrates numbers computed elsewhere.)
 
-## Forget AI agents, forget autonomous investing — build something people trust
+## MVP scope
 
-The framing behind every version below (user's words, 2026-08-02). v1 is
-five deterministic-first features people can verify by hand; only v2 adds
-proactive intelligence, and only v3 starts reasoning across all of it
-together. Skipping straight to "AI agent that manages your portfolio"
-is exactly what this product is not — see AI philosophy above.
+Five features, build in this order — status of each is in "What's built"
+above:
 
-## MVP scope (v1) — build in this order
-
-Portfolio Import (CSV + manual entry, done — design so brokerage APIs
-like Plaid/SnapTrade slot in later without a rewrite) is the prerequisite
-everything below sits on. Status of each feature is in "What's built"
-above.
-
-1. **Trade Check** — "I want to buy 50 shares of XYZ" in → concentration
-   impact, sector exposure, ETF overlap, diversification score, risk
-   score.
-2. **Tax Check** — before selling: wash-sale warning, short-term gain
-   warning, long-term gain countdown, estimated tax. Never estimate
+1. **Portfolio Import** — CSV + manual entry; design so brokerage APIs
+   (Plaid, SnapTrade) can be added later without a rewrite.
+2. **Trade Check** — ticker/shares/buy-or-sell in → concentration
+   warning, sector allocation change, ETF overlap, diversification
+   impact, estimated volatility impact, allocation after trade, overall
+   trade health score.
+3. **Tax Check** — wash-sale risk, short vs. long-term gains, estimated
+   realized gain/loss, tax-lot selection (future). Never estimate taxes
    without clearly labeling assumptions.
-3. **Portfolio Health Score** — a daily score, e.g. `Overall: 83,
-   Diversification: A, Tax efficiency: B-, Concentration: C, Sector
-   balance: B+, Cash allocation: A`. Each score needs an actionable
-   recommendation eventually, not just a letter.
-4. **AI Trade Review** — instead of "open ChatGPT and paste your
-   portfolio," build the prompts in: "Explain why this trade may be a
-   mistake," "Challenge my reasoning." An intelligent devil's advocate,
-   not an oracle — same never-buy-never-sell constraint as everywhere
-   else in this app, just conversational instead of a fixed panel.
-5. **Investment Journal** — on purchase, ask why (long-term growth,
-   dividend income, value opportunity, ...). Save it. Later, remind the
-   user against their own stated thesis. This is the feature most likely
-   to create real behavioral trust, because it holds the user accountable
-   to themselves, not to the app's opinion.
+4. **Portfolio Health** — Diversification, Sector Balance, Concentration,
+   Tax Efficiency, Cash Allocation, Risk. Each score needs an actionable
+   recommendation, not just a number.
+5. **Investment Journal** — on purchase, ask why you're buying, your time
+   horizon, what would make you sell, what risks concern you. Save it,
+   reference it later.
 
-## Version 2 — once people love the basics, add proactive intelligence
+## Future vision
 
-Don't start this until v1 has real users who'd notice if it disappeared.
-Each of these is a *push* version of something v1 already computes
-on-demand — cheaper to build later than it looks, once v1 exists:
-
-- **Smart alerts** — "Your portfolio is now 42% technology. No action?"
-  Passive version of the existing concentration verdict (`concentration.ts`)
-  — the new part is a notification surface (no email/push infra exists
-  today; would ride on Resend, already wired for auth email, or an
-  in-app banner on next login).
-- **Duplicate exposure** — "Buying Google? You already own it in VTI,
-  VOO, QQQ, SCHG." This *is* `etfOverlap.ts`, just run proactively across
-  the whole portfolio instead of only against a trade being simulated —
-  the engine already exists, this is a scan-everything wrapper around it.
-- **Opportunity alerts** — "$14,000 of unrealized losses could be
-  harvested while keeping a similar allocation." The unharvested-loss
-  math already lives inside `taxEfficiencyScore` (`scores.ts`) as one
-  input to a sub-score; surfacing it as its own dollar-figure alert is
-  cheap.
-- **Behavioral alerts** — "You've bought the same stock four times after
-  it gained >15% in a week." Real gap: needs pattern detection across
-  purchase history *and* the price at each purchase relative to the
-  days before it — `quotes.ts` only stores the current price, no
-  historical series, so this needs either a price-history table or a
-  historical-price API added first.
-- **Drift detection** — "You wanted 60% VTI, you're now at 48%." Real
-  gap: needs a brand-new concept, user-defined *target* allocations
-  (by ticker or sector) — nothing in the schema today stores a target,
-  only the concentration *threshold* (a ceiling, not a target). Needs a
-  new table.
-
-## Version 3 — the Financial Decision Graph (long-term vision)
-
-Once v1 + v2 exist, Ledger Check knows holdings (`lots`/`sales`), taxes
-(`taxCheck.ts`/`scores.ts`), goals and conviction (Investment Journal),
-diversification (`scores.ts`), and — once v2 lands — behavior and a
-rebalancing/drift schedule. Watchlists don't exist yet in any form. Tying
-all of it together turns "what should I buy?" into "what's the best next
-action for this investor?" — a fundamentally harder question to copy than
-a generic chatbot, because it requires the whole graph, not just an LLM.
-**Don't build this until v1 demonstrates product-market fit** — same
-discipline as every other future-vision item in this doc.
-
-## Revenue model
-
-Staged with the version plan above, not ahead of it:
-
-- **Free** — Portfolio import, health score, basic (passive) warnings.
-- **Pro ($10–15/mo)** — Tax analysis, AI trade review, investment journal,
-  portfolio overlap, smart alerts (v2).
-- **Later** — Advisor version, CPA dashboard, brokerage API access,
-  white-label licensing (v3-adjacent, roughly Phase 2-4 of the roadmap
-  above).
-
-**No billing infrastructure exists today** — no Stripe, no paywall
-gating, no plan/tier concept anywhere in the schema or API layer. Not
-needed until v1's five features are real and used; premature to build
-before that, per Product Principle 1 (prevent expensive mistakes) applied
-to the business itself, not just the user's portfolio.
+Ledger Check eventually becomes the operating system for self-directed
+investors: brokerage integrations, options analysis, tax-loss harvesting,
+a rebalancing engine, portfolio drift detection, dividend forecasting, AI
+portfolio review, advisor/CPA dashboards. **Don't build these until the
+MVP demonstrates product-market fit.**
 
 ## Success metric
 

@@ -31,5 +31,5 @@ export async function POST(request: Request) {
   if (!outcome.ok) {
     return NextResponse.json({ error: outcome.error }, { status: 400 });
   }
-  return NextResponse.json({ ok: true }, { status: 201 });
+  return NextResponse.json({ ok: true, lotId: outcome.lotId }, { status: 201 });
 }

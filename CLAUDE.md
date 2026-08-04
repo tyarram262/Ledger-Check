@@ -56,31 +56,42 @@ not checked into the repo. Inspect it live (`mcp__supabase__list_tables` /
   is written so the user's own session is sufficient. Don't introduce it
   unless a genuine admin-only operation requires it.
 
-## Auth flow (working end to end as of 2026-07-31)
+## Auth flow (working end to end as of 2026-08-03)
 
 - `src/proxy.ts` + `src/lib/supabase/proxy.ts` gate every route except
   `/login` and `/auth/*`.
 - `login/actions.ts` derives `emailRedirectTo` from the request's `Origin`
   header so one Supabase project serves both localhost and prod (Supabase
-  only has one `Site URL`).
+  only has one `Site URL`) — now hard-fails with a user-facing error if
+  `Origin` is missing, rather than silently falling back to Site URL.
 - Two email templates matter: Supabase's **"Confirm signup"** (new
-  address) and **"Magic Link"** (returning). Both use PKCE-style links
-  (`?token_hash={{ .TokenHash }}&type=email`). Editing a template requires
-  custom SMTP configured first.
+  address) and **"Magic Link"** (returning). Both use PKCE-style links.
+  **Both must render `{{ .RedirectTo }}`, not `{{ .SiteURL }}`** —
+  `.SiteURL` ignores `emailRedirectTo` entirely and always resolves to the
+  project's single configured Site URL, which is what caused prod sign-ins
+  to land on `localhost` (fixed 2026-08-03). Template link shape:
+  `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email`. Editing a
+  template requires custom SMTP configured first.
 - **Custom SMTP is live via Resend** (`smtp.resend.com:465`, sender
   `onboarding@resend.dev`). **Known limitation:** Resend sandbox mode only
   delivers to the exact email the account was created with —
   **`tanush.yarram@gmail.com`**. Every other address gets a hard `550`.
   Fix: verify a domain on Resend (see roadmap below) — not urgent for
   single-user use.
-- Supabase Dashboard → Authentication → URL Configuration → Additional
-  Redirect URLs needs both the localhost and prod `/auth/confirm` URLs.
-  No MCP tool covers Auth/SMTP config — dashboard-only, user must do it.
-- **Uncommitted local changes exist** (as of this handoff) in
-  `src/app/auth/confirm/route.ts` and `src/app/login/page.tsx` — adds a
-  code-based callback fallback, an existing-session fallback, and
-  `otp_expired`-specific messaging. Not authored or verified by the
-  session that wrote this paragraph; review before committing.
+- Supabase Dashboard → Authentication → URL Configuration needs **Site
+  URL** set to the prod domain, plus both the localhost and prod
+  `/auth/confirm` origins in Additional Redirect URLs (wildcarded, e.g.
+  `https://ledger-check-henna.vercel.app/**`). No MCP tool covers
+  Auth/SMTP/template config — dashboard-only, user must do it.
+- **2026-08-03: discarded, not committed** — a local edit had replaced the
+  magic-link form (`src/app/login/page.tsx`) with an auto-firing
+  `supabase.auth.signInAnonymously()` guest session, plus a `layout.tsx`
+  tweak to label anonymous sessions. Reverted: anonymous sign-ins aren't
+  enabled in Supabase, every anonymous session mints a fresh `auth.uid()`
+  (orphaning the demo portfolio under RLS), and it didn't address the
+  localhost-redirect bug anyway. If a demo/guest mode is ever wanted, it
+  belongs behind an explicit opt-in button, not as the default `/login`
+  behavior.
 
 ## What's built vs. the MVP (current numbering, 2026-08-02)
 

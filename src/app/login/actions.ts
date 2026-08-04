@@ -16,13 +16,22 @@ export async function login(
 
   // Send the magic link back to whichever origin the user is signing in
   // from (localhost in dev, the deployed domain in prod) rather than a
-  // fixed Site URL — Supabase only supports one Site URL per project.
+  // fixed Site URL — Supabase only supports one Site URL per project. This
+  // only works because the Magic Link / Confirm signup templates render
+  // {{ .RedirectTo }} (which carries emailRedirectTo through) instead of
+  // {{ .SiteURL }} (which ignores it and always uses the project's single
+  // configured Site URL) — dashboard-only config, see CLAUDE.md.
   const origin = (await headers()).get("origin");
+  if (!origin) {
+    return {
+      error: "Could not determine the sign-in origin. Please try again.",
+    };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: origin ? { emailRedirectTo: `${origin}/auth/confirm` } : undefined,
+    options: { emailRedirectTo: `${origin}/auth/confirm` },
   });
   if (error) {
     // Some failures (e.g. the SMTP provider rejecting the send) surface as

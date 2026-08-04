@@ -10,7 +10,8 @@ export default function LoginPage() {
     undefined
   );
   const searchParams = useSearchParams();
-  const linkExpired = searchParams.get("error") === "1";
+  const authError = searchParams.get("error");
+  const linkExpired = authError === "1" || authError === "otp_expired";
 
   if (state?.sent) {
     return (
@@ -48,7 +49,9 @@ export default function LoginPage() {
         </label>
         {linkExpired && !state?.error && (
           <p className="text-sm text-red-600">
-            That link expired or was already used — request a new one below.
+            {authError === "otp_expired"
+              ? "That sign-in link was already consumed or expired before it reached this browser. Request a fresh link and open only the newest email."
+              : "That link expired or was already used — request a new one below."}
           </p>
         )}
         {state?.error && <p className="text-sm text-red-600">{state.error}</p>}

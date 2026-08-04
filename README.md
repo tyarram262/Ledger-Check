@@ -17,6 +17,7 @@ Multi-user, backed by Supabase (Postgres + Auth). Add these to `.env.local`:
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 CLAUDE_API_KEY=your-key-here   # for the AI digest (Claude 4.5 Haiku)
+NEXT_PUBLIC_APP_URL=https://ledger-check-henna.vercel.app
 ```
 
 Sign-in is passwordless (magic link via email) — see "Auth setup" below for
@@ -43,6 +44,9 @@ manages instead of code:
    ```html
    <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">Sign in</a>
    ```
+
+  In production, set `NEXT_PUBLIC_APP_URL` to the deployed Vercel URL so the
+  emailed link never points at `localhost`.
 
 ## Pages
 

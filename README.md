@@ -36,12 +36,19 @@ migration — nothing to run manually there. Two things Supabase's Dashboard
 manages instead of code:
 
 1. **URL Configuration** (Authentication → URL Configuration): set the Site
-   URL to your app's URL (e.g. `http://localhost:3000` for local dev).
-2. **Email template** (Authentication → Email Templates → Magic Link): change
-   the link to route through the app's token-exchange endpoint instead of
-   Supabase's default confirmation URL:
+   URL to your production URL, and add every origin that should be able to
+   sign in (e.g. `http://localhost:3000/**` and your deployed URL with
+   `/**`) to Additional Redirect URLs.
+2. **Email templates** (Authentication → Email Templates → Magic Link *and*
+   Confirm signup — both matter): change the link to route through the
+   app's token-exchange endpoint instead of Supabase's default confirmation
+   URL, using `{{ .RedirectTo }}` rather than `{{ .SiteURL }}` — `.SiteURL`
+   is fixed to the single Site URL above regardless of which origin the
+   user signed in from, while `.RedirectTo` carries through the
+   `emailRedirectTo` the app already passes per-request, so localhost and
+   production each get links back to themselves:
    ```html
-   <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">Sign in</a>
+   <a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">Sign in</a>
    ```
 
 ## Pages

@@ -102,7 +102,16 @@ export default function HoldingsTable({
                   <td className="py-2 pr-3 text-right">
                     {formatUsd(lot.shares * lot.costPerShare)}
                   </td>
-                  <td className="py-2 pr-3 text-slate-600">{lot.purchaseDate}</td>
+                  <td className="py-2 pr-3 text-slate-600">
+                    {lot.purchaseDate ?? (
+                      <span
+                        className="text-amber-600"
+                        title="Synced from your brokerage with limited transaction history — excluded from wash-sale and holding-period checks."
+                      >
+                        Unknown
+                      </span>
+                    )}
+                  </td>
                   <td className="py-2 text-right">
                     <button
                       onClick={() => handleDelete(lot.id)}

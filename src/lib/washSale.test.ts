@@ -239,6 +239,73 @@ describe("checkWashSale — sell side", () => {
   });
 });
 
+describe("checkWashSale — lots with no known purchase date", () => {
+  it("surfaces an uncheckable-lot caveat instead of silently passing when the only held shares have no date", () => {
+    const lots = [
+      makeLot({ ticker: "PYPL", shares: 10, costPerShare: 220, purchaseDate: null, accountId: 1 }),
+    ];
+    const warning = checkWashSale(
+      { side: "sell", ticker: "PYPL", shares: 5, pricePerShare: 200, accountId: 1 },
+      [],
+      lots,
+      ACCOUNTS,
+      TODAY
+    );
+    expect(warning).not.toBeNull();
+    expect(warning?.triggers).toHaveLength(0);
+    expect(warning?.uncheckableLots).toHaveLength(1);
+    expect(warning?.uncheckableLots[0].shares).toBe(5); // 5 of the 10 remain held after the sale
+    expect(warning?.message).toContain("no known purchase date");
+  });
+
+  it("does not flag or caveat when the undated lot is fully consumed by the sale", () => {
+    const lots = [
+      makeLot({ ticker: "PYPL", shares: 10, costPerShare: 220, purchaseDate: null, accountId: 1 }),
+    ];
+    const warning = checkWashSale(
+      { side: "sell", ticker: "PYPL", shares: 10, pricePerShare: 200, accountId: 1 },
+      [],
+      lots,
+      ACCOUNTS,
+      TODAY
+    );
+    expect(warning).toBeNull();
+  });
+
+  it("still flags normally on a real recent-buy trigger, and separately lists an uncheckable lot in another account", () => {
+    const lots = [
+      makeLot({ ticker: "PYPL", shares: 10, costPerShare: 220, purchaseDate: "2026-06-20", accountId: 1 }),
+      makeLot({ ticker: "PYPL", shares: 3, costPerShare: 210, purchaseDate: null, accountId: 2, accountName: "Vanguard Roth" }),
+    ];
+    const warning = checkWashSale(
+      { side: "sell", ticker: "PYPL", shares: 5, pricePerShare: 200, accountId: 1 },
+      [],
+      lots,
+      ACCOUNTS,
+      TODAY
+    );
+    expect(warning?.kind).toBe("sell-with-recent-buy");
+    expect(warning?.triggers).toHaveLength(1);
+    expect(warning?.uncheckableLots).toHaveLength(1);
+    expect(warning?.uncheckableLots[0].accountName).toBe("Vanguard Roth");
+  });
+
+  it("null-dated lots sort last in FIFO order (treated as newest, the conservative assumption)", () => {
+    const lots = [
+      makeLot({ ticker: "SHOP", shares: 10, costPerShare: 200, purchaseDate: null }),
+      makeLot({ ticker: "SHOP", shares: 10, costPerShare: 100, purchaseDate: "2025-01-01" }),
+    ];
+    const preview = previewFifoSell(
+      { side: "sell", ticker: "SHOP", shares: 10, pricePerShare: 150, accountId: 1 },
+      lots
+    );
+    // The dated (older) lot is consumed first, leaving the undated one held.
+    expect(preview.consumedLots).toHaveLength(1);
+    expect(preview.consumedLots[0].lot.purchaseDate).toBe("2025-01-01");
+    expect(preview.remainingLots[0].lot.purchaseDate).toBeNull();
+  });
+});
+
 describe("previewFifoSell", () => {
   it("consumes lots oldest-first and averages the basis", () => {
     const lots = [

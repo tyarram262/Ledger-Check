@@ -53,3 +53,20 @@ describe("daysUntilLongTerm", () => {
     expect(daysUntilLongTerm("2026-04-15", "2027-04-15")).toBe(1);
   });
 });
+
+// A brokerage sync with shallow transaction history can't always
+// reconstruct a purchase date (see `types.ts`'s `Lot`) — every function
+// here must degrade to "unknown"/null rather than fabricate a date.
+describe("null purchase date (unknown-provenance lots)", () => {
+  it("termFor classifies a null purchase date as unknown, not short or long", () => {
+    expect(termFor(null, "2026-08-02")).toBe("unknown");
+  });
+
+  it("longTermOn returns null for a null purchase date", () => {
+    expect(longTermOn(null)).toBeNull();
+  });
+
+  it("daysUntilLongTerm returns null for a null purchase date", () => {
+    expect(daysUntilLongTerm(null, "2026-08-02")).toBeNull();
+  });
+});

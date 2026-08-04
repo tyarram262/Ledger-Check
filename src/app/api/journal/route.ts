@@ -32,6 +32,13 @@ export async function POST(request: Request) {
   // purchase the caller owns (RLS-scoped), not arbitrary client data.
   const lot = (await listLots()).find((l) => l.id === lotId);
   if (!lot) errors.push("Unknown lot.");
+  // A synced lot with no reconstructable purchase date (see `types.ts`'s
+  // `Lot`) can't back a journal entry — the horizon-review math needs a
+  // real date to count from, and a fabricated one would silently corrupt
+  // the "this time horizon has closed" check later.
+  else if (lot.purchaseDate === null) {
+    errors.push("This holding has no known purchase date (synced with limited history), so it can't be journaled yet.");
+  }
 
   if (errors.length > 0) {
     return NextResponse.json({ error: errors.join(" ") }, { status: 400 });
@@ -43,7 +50,7 @@ export async function POST(request: Request) {
     accountId: lot!.accountId,
     shares: lot!.shares,
     costPerShare: lot!.costPerShare,
-    purchaseDate: lot!.purchaseDate,
+    purchaseDate: lot!.purchaseDate as string,
     reason: reason!,
     timeHorizon,
     sellTrigger: trimToLength(body?.sellTrigger, OPTIONAL_MAX),

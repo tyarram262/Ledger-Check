@@ -175,3 +175,61 @@ describe("checkTax — wash-sale integration", () => {
     expect(result.washSale).toBeNull();
   });
 });
+
+describe("checkTax — lots with no known purchase date", () => {
+  it("excludes an unknown-term lot from short/long gain totals and the tax estimate, and warns instead of guessing", () => {
+    const lots = [
+      makeLot({ ticker: "IBM", shares: 10, costPerShare: 100, purchaseDate: null, accountId: 1 }),
+    ];
+    const result = checkTax(
+      { side: "sell", ticker: "IBM", shares: 10, pricePerShare: 150, accountId: 1 },
+      lots,
+      [],
+      ACCOUNTS,
+      PROFILE,
+      TODAY
+    );
+    expect(result.lotBreakdown[0].term).toBe("unknown");
+    expect(result.lotBreakdown[0].longTermOn).toBeNull();
+    expect(result.lotBreakdown[0].daysUntilLongTerm).toBeNull();
+    expect(result.shortTermGainLoss).toBe(0);
+    expect(result.longTermGainLoss).toBe(0);
+    expect(result.unknownTermGainLoss).toBe(500);
+    expect(result.estimatedTax.total).toBe(0);
+    expect(result.unknownTermWarning).toContain("10 shares");
+  });
+
+  it("only excludes the unknown-date portion when a sell spans both a dated and an undated lot", () => {
+    const lots = [
+      makeLot({ ticker: "IBM", shares: 5, costPerShare: 100, purchaseDate: "2024-01-01", accountId: 1 }), // dated, long-term
+      makeLot({ ticker: "IBM", shares: 5, costPerShare: 100, purchaseDate: null, accountId: 1 }), // undated, sorts last (FIFO)
+    ];
+    const result = checkTax(
+      { side: "sell", ticker: "IBM", shares: 10, pricePerShare: 150, accountId: 1 },
+      lots,
+      [],
+      ACCOUNTS,
+      PROFILE,
+      TODAY
+    );
+    expect(result.longTermGainLoss).toBe((150 - 100) * 5); // only the dated lot
+    expect(result.unknownTermGainLoss).toBe((150 - 100) * 5); // only the undated lot
+    expect(result.estimatedTax.total).toBeCloseTo(250 * 0.15, 5); // dated portion only
+    expect(result.unknownTermWarning).toContain("some");
+  });
+
+  it("has no unknownTermWarning when every lot has a known date", () => {
+    const lots = [
+      makeLot({ ticker: "KO", shares: 10, costPerShare: 100, purchaseDate: "2024-01-01", accountId: 1 }),
+    ];
+    const result = checkTax(
+      { side: "sell", ticker: "KO", shares: 10, pricePerShare: 150, accountId: 1 },
+      lots,
+      [],
+      ACCOUNTS,
+      PROFILE,
+      TODAY
+    );
+    expect(result.unknownTermWarning).toBeNull();
+  });
+});

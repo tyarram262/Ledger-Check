@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { Account, AccountType, Lot, Sale } from "@/lib/types";
+import type { Account, AccountType, Lot, LotSource, Sale } from "@/lib/types";
 import type { FilingStatus } from "@/lib/taxRates";
 import { horizonReviewDate, type JournalEntry, type TimeHorizon } from "@/lib/journal";
 
@@ -38,6 +38,53 @@ export async function createAccount(
   return mapAccount(data as AccountRow);
 }
 
+/** Creates (or, on a rerun of Link for the same brokerage account, reuses)
+ *  an account backed by a SnapTrade connection. `snaptrade_account_id` is
+ *  unique per user so re-linking the same brokerage account is idempotent
+ *  rather than creating a duplicate. */
+export async function upsertSnapTradeAccount(input: {
+  name: string;
+  type: AccountType;
+  snaptradeAccountId: string;
+  connectionId: number;
+}): Promise<Account> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("accounts")
+    .upsert(
+      {
+        name: input.name,
+        type: input.type,
+        snaptrade_account_id: input.snaptradeAccountId,
+        connection_id: input.connectionId,
+        sync_source: "snaptrade",
+      },
+      { onConflict: "user_id,snaptrade_account_id" }
+    )
+    .select("id, name, type, cash_balance")
+    .single();
+  if (error) throw new Error(error.message);
+  return mapAccount(data as AccountRow);
+}
+
+/** Maps `accounts.snaptrade_account_id` -> local account id, for resolving
+ *  which local account a sync response belongs to. */
+export async function listSnapTradeAccountLinks(): Promise<
+  { accountId: number; snaptradeAccountId: string; connectionId: number | null }[]
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("accounts")
+    .select("id, snaptrade_account_id, connection_id")
+    .not("snaptrade_account_id", "is", null);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => ({
+    accountId: r.id as number,
+    snaptradeAccountId: r.snaptrade_account_id as string,
+    connectionId: r.connection_id as number | null,
+  }));
+}
+
 /** Updates an account's cash balance. Returns false if the id doesn't
  *  resolve to a row the caller owns (RLS-scoped), not an error. */
 export async function updateAccountCash(id: number, cashBalance: number): Promise<boolean> {
@@ -57,9 +104,12 @@ interface LotRow {
   ticker: string;
   shares: number;
   cost_per_share: number;
-  purchase_date: string;
+  purchase_date: string | null;
+  source: LotSource;
   accounts: { name: string } | null;
 }
+
+const LOT_SELECT = "id, account_id, ticker, shares, cost_per_share, purchase_date, source, accounts(name)";
 
 function mapLot(r: LotRow): Lot {
   return {
@@ -70,6 +120,7 @@ function mapLot(r: LotRow): Lot {
     shares: r.shares,
     costPerShare: r.cost_per_share,
     purchaseDate: r.purchase_date,
+    source: r.source ?? "manual",
   };
 }
 
@@ -77,7 +128,7 @@ export async function listLots(): Promise<Lot[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("lots")
-    .select("id, account_id, ticker, shares, cost_per_share, purchase_date, accounts(name)")
+    .select(LOT_SELECT)
     .order("ticker")
     .order("purchase_date");
   if (error) throw new Error(error.message);
@@ -90,6 +141,7 @@ export async function createLot(input: {
   shares: number;
   costPerShare: number;
   purchaseDate: string;
+  source?: LotSource;
 }): Promise<number> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -100,6 +152,7 @@ export async function createLot(input: {
       shares: input.shares,
       cost_per_share: input.costPerShare,
       purchase_date: input.purchaseDate,
+      source: input.source ?? "manual",
     })
     .select("id")
     .single();
@@ -122,11 +175,71 @@ export async function bulkCreateLots(
         shares: l.shares,
         cost_per_share: l.costPerShare,
         purchase_date: l.purchaseDate,
+        source: "csv" as const,
       }))
     )
     .select("id");
   if (error) throw new Error(error.message);
   return (data ?? []).length;
+}
+
+/**
+ * Idempotent brokerage-sync upsert for one account's lots, keyed on
+ * `(account_id, external_key)` rather than delete-and-reinsert. A wholesale
+ * replace would be simpler, but `journal_entries.lot_id` is `ON DELETE SET
+ * NULL` (see CLAUDE.md) — destroying and recreating every lot on each sync
+ * would orphan a journal entry's link every single time, not just when a
+ * position is genuinely closed. Only lots whose `external_key` no longer
+ * appears in this sync are deleted (a position fully exited at the broker).
+ */
+export async function upsertSyncedLots(
+  accountId: number,
+  lots: {
+    externalKey: string;
+    ticker: string;
+    shares: number;
+    costPerShare: number;
+    purchaseDate: string | null;
+  }[]
+): Promise<{ upserted: number; removed: number }> {
+  const supabase = await createClient();
+
+  if (lots.length > 0) {
+    const { error: upsertError } = await supabase.from("lots").upsert(
+      lots.map((l) => ({
+        account_id: accountId,
+        external_key: l.externalKey,
+        ticker: l.ticker.toUpperCase(),
+        shares: l.shares,
+        cost_per_share: l.costPerShare,
+        purchase_date: l.purchaseDate,
+        source: "snaptrade" as const,
+      })),
+      { onConflict: "account_id,external_key" }
+    );
+    if (upsertError) throw new Error(upsertError.message);
+  }
+
+  // `external_key` values are broker-supplied (activity/lot ids, or a
+  // `ticker:residual` fallback) — use `.notIn()` rather than hand-building
+  // an `in (...)` filter string, so a value containing a reserved
+  // PostgREST character (comma, quote, parenthesis) can't corrupt the
+  // filter instead of just being excluded.
+  const keptKeys = lots.map((l) => l.externalKey);
+  let removeQuery = supabase
+    .from("lots")
+    .delete()
+    .eq("account_id", accountId)
+    .eq("source", "snaptrade")
+    .not("external_key", "is", null)
+    .select("id");
+  if (keptKeys.length > 0) {
+    removeQuery = removeQuery.notIn("external_key", keptKeys);
+  }
+  const { data: removedRows, error: removeError } = await removeQuery;
+  if (removeError) throw new Error(removeError.message);
+
+  return { upserted: lots.length, removed: (removedRows ?? []).length };
 }
 
 export async function deleteLot(id: number): Promise<boolean> {
@@ -443,4 +556,97 @@ export async function deleteJournalEntry(id: number): Promise<boolean> {
     .select("id");
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
+}
+
+/** The current session's Supabase user id — needed as SnapTrade's
+ *  `registerUser` `userId` (a separate namespace from `auth.uid()`, but
+ *  reusing it is the simplest stable, immutable choice SnapTrade
+ *  recommends against using an email for). */
+export async function getCurrentUserId(): Promise<string> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) throw new Error("Not authenticated.");
+  return data.user.id;
+}
+
+// --- Phase 2: SnapTrade brokerage sync -------------------------------
+
+export interface SnapTradeCredentials {
+  snaptradeUserId: string;
+  userSecret: string;
+}
+
+/** `user_secret` grants read access to the user's live brokerage data —
+ *  never select this into a client component or log it (see CLAUDE.md's
+ *  "encrypt brokerage tokens" Phase 3 item, which applies to this column). */
+export async function getSnapTradeCredentials(): Promise<SnapTradeCredentials | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("snaptrade_users")
+    .select("snaptrade_user_id, user_secret")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return { snaptradeUserId: data.snaptrade_user_id, userSecret: data.user_secret };
+}
+
+export async function saveSnapTradeCredentials(creds: SnapTradeCredentials): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("snaptrade_users").upsert(
+    { snaptrade_user_id: creds.snaptradeUserId, user_secret: creds.userSecret },
+    { onConflict: "user_id" }
+  );
+  if (error) throw new Error(error.message);
+}
+
+export interface BrokerageConnectionRow {
+  id: number;
+  authorizationId: string;
+  brokerageName: string | null;
+  disabled: boolean;
+  lastSyncedAt: string | null;
+}
+
+export async function listBrokerageConnections(): Promise<BrokerageConnectionRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("brokerage_connections")
+    .select("id, authorization_id, brokerage_name, disabled, last_synced_at")
+    .order("id");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    authorizationId: r.authorization_id,
+    brokerageName: r.brokerage_name,
+    disabled: r.disabled,
+    lastSyncedAt: r.last_synced_at,
+  }));
+}
+
+/** Idempotent on `authorization_id` — SnapTrade's connection portal can
+ *  redirect back to us more than once for the same authorization. */
+export async function upsertBrokerageConnection(input: {
+  authorizationId: string;
+  brokerageName: string | null;
+}): Promise<number> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("brokerage_connections")
+    .upsert(
+      { authorization_id: input.authorizationId, brokerage_name: input.brokerageName },
+      { onConflict: "user_id,authorization_id" }
+    )
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return data.id;
+}
+
+export async function touchConnectionSynced(connectionId: number): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("brokerage_connections")
+    .update({ last_synced_at: new Date().toISOString() })
+    .eq("id", connectionId);
+  if (error) throw new Error(error.message);
 }

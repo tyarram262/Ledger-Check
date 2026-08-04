@@ -17,6 +17,11 @@ Multi-user, backed by Supabase (Postgres + Auth). Add these to `.env.local`:
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 CLAUDE_API_KEY=your-key-here   # for the AI digest (Claude 4.5 Haiku)
+
+# Optional — enables brokerage sync via SnapTrade (/holdings). Without
+# these, the app works exactly as before (manual entry + CSV import only).
+SNAPTRADE_CLIENT_ID=your-client-id
+SNAPTRADE_CONSUMER_KEY=your-consumer-key
 ```
 
 Sign-in is passwordless (magic link via email) — see "Auth setup" below for

@@ -6,6 +6,7 @@ import SaleForm from "@/components/SaleForm";
 import HoldingsTable from "@/components/HoldingsTable";
 import SalesTable from "@/components/SalesTable";
 import CsvImport from "@/components/CsvImport";
+import BrokerageConnect from "@/components/BrokerageConnect";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,7 @@ export default async function HoldingsPage() {
           </h3>
           <CsvImport accounts={accounts} />
         </div>
+        <BrokerageConnect />
         <div className="mt-6">
           <HoldingsTable lots={lots} entries={journalEntries} />
         </div>

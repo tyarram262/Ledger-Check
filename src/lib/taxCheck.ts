@@ -18,8 +18,8 @@ export interface LotTaxDetail {
   sharesSold: number;
   term: HoldingTerm;
   gainLoss: number;
-  longTermOn: string;
-  daysUntilLongTerm: number;
+  longTermOn: string | null;
+  daysUntilLongTerm: number | null;
 }
 
 export interface TaxCheckResult {
@@ -28,6 +28,11 @@ export interface TaxCheckResult {
   washSale: WashSaleWarning | null;
   shortTermGainLoss: number;
   longTermGainLoss: number;
+  /** Gain/loss from lots with no known purchase date (see `types.ts`'s
+   *  `Lot`) — excluded from `shortTermGainLoss`/`longTermGainLoss` and
+   *  `estimatedTax` rather than guessed, and called out via
+   *  `unknownTermWarning`. */
+  unknownTermGainLoss: number;
   lotBreakdown: LotTaxDetail[];
   estimatedTax: {
     shortTermTax: number;
@@ -37,6 +42,7 @@ export interface TaxCheckResult {
     longTermRate: number;
   };
   shortTermWarning: string | null;
+  unknownTermWarning: string | null;
   longTermCountdown: {
     shares: number;
     daysAway: number;
@@ -49,6 +55,15 @@ function isIraAccount(accounts: Account[], accountId: number | undefined): boole
   if (accountId == null) return false;
   const account = accounts.find((a) => a.id === accountId);
   return account?.type === "roth" || account?.type === "traditional_ira";
+}
+
+/** A `LotTaxDetail` known to be a short-term gain — narrows `longTermOn`/
+ *  `daysUntilLongTerm` to non-null, letting the countdown logic below read
+ *  them directly instead of asserting past the type checker with `!`. */
+type ShortTermGainDetail = LotTaxDetail & { term: "short"; longTermOn: string; daysUntilLongTerm: number };
+
+function isShortTermGain(d: LotTaxDetail): d is ShortTermGainDetail {
+  return d.term === "short" && d.gainLoss > 0;
 }
 
 /**
@@ -93,6 +108,8 @@ export function checkTax(
   const longTermGainLoss = lotBreakdown
     .filter((d) => d.term === "long")
     .reduce((sum, d) => sum + d.gainLoss, 0);
+  const unknownTermLots = lotBreakdown.filter((d) => d.term === "unknown");
+  const unknownTermGainLoss = unknownTermLots.reduce((sum, d) => sum + d.gainLoss, 0);
 
   const stRate = ira ? 0 : shortTermRate(profile);
   const ltRate = ira ? 0 : longTermRate(profile);
@@ -108,13 +125,16 @@ export function checkTax(
       ? `$${shortTermGainLoss.toFixed(2)} of this sale would be a short-term gain, taxed as ordinary income at an estimated ${stRate.toFixed(1)}% — instead of the lower long-term rate.`
       : null;
 
+  const unknownTermWarning =
+    unknownTermLots.length > 0
+      ? `${unknownTermLots.reduce((sum, d) => sum + d.sharesSold, 0)} shares (${lotBreakdown.length > unknownTermLots.length ? "some" : "all"} of this sale) have no known purchase date, so we can't classify them as short- or long-term — they're excluded from the estimate below.`
+      : null;
+
   let longTermCountdown: TaxCheckResult["longTermCountdown"] = null;
   if (!ira) {
-    const shortTermGainLots = lotBreakdown.filter((d) => d.term === "short" && d.gainLoss > 0);
+    const shortTermGainLots = lotBreakdown.filter(isShortTermGain);
     if (shortTermGainLots.length > 0) {
-      const nearest = [...shortTermGainLots].sort(
-        (a, b) => a.daysUntilLongTerm - b.daysUntilLongTerm
-      )[0];
+      const nearest = [...shortTermGainLots].sort((a, b) => a.daysUntilLongTerm - b.daysUntilLongTerm)[0];
       const taxSaved = nearest.gainLoss * ((stRate - ltRate) / 100);
       if (taxSaved > 0) {
         longTermCountdown = {
@@ -132,6 +152,7 @@ export function checkTax(
     washSale,
     shortTermGainLoss,
     longTermGainLoss,
+    unknownTermGainLoss,
     lotBreakdown,
     estimatedTax: {
       shortTermTax,
@@ -141,6 +162,7 @@ export function checkTax(
       longTermRate: ltRate,
     },
     shortTermWarning,
+    unknownTermWarning,
     longTermCountdown,
   };
 }

@@ -13,6 +13,8 @@ export interface Account {
   cashBalance: number;
 }
 
+export type LotSource = "manual" | "csv" | "snaptrade";
+
 export interface Lot {
   id: number;
   accountId: number;
@@ -20,7 +22,13 @@ export interface Lot {
   ticker: string;
   shares: number;
   costPerShare: number;
-  purchaseDate: string; // ISO date (YYYY-MM-DD)
+  /** ISO date (YYYY-MM-DD), or `null` when a brokerage sync couldn't
+   *  determine a purchase date (shallow transaction history — see
+   *  `reconcileLots.ts`). Null-dated lots are deliberately excluded from
+   *  wash-sale and holding-period verdicts rather than given a fabricated
+   *  date — see CLAUDE.md's "never estimate without labeling assumptions". */
+  purchaseDate: string | null;
+  source: LotSource;
 }
 
 export interface Sale {

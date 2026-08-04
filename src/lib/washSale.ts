@@ -21,6 +21,18 @@ export interface WashSaleTrigger {
   isIra: boolean;
 }
 
+/** A same-ticker lot with no known purchase date (see `types.ts`'s `Lot`)
+ *  that would still be held after a sell — it CANNOT be proven to sit
+ *  outside the 30-day wash-sale window, so it's surfaced as a caveat
+ *  instead of silently passing the check. Under-warning is the dangerous
+ *  direction here, unlike the tax-estimate paths that simply exclude
+ *  unknown-date lots. */
+export interface UncheckableLot {
+  ticker: string;
+  shares: number;
+  accountName: string;
+}
+
 export interface WashSaleWarning {
   kind: "buy-after-loss" | "sell-with-recent-buy";
   ticker: string;
@@ -34,6 +46,10 @@ export interface WashSaleWarning {
    * materially worse outcome than a same-taxable-account wash sale.
    */
   isIraPermanent: boolean;
+  /** Same-ticker lots with no known purchase date that would still be held
+   *  after this sell — can't be checked against the 30-day window. Usually
+   *  empty; see `UncheckableLot`. */
+  uncheckableLots: UncheckableLot[];
 }
 
 function isIraAccount(accounts: Account[], accountId: number | undefined): boolean {
@@ -56,6 +72,17 @@ export interface SellPreview {
   consumedLots: { lot: Lot; shares: number }[];
 }
 
+/** FIFO ordering, oldest first. Null-dated lots (unknown purchase date —
+ *  see `types.ts`) sort last, i.e. treated as the newest/most recently
+ *  bought — the conservative assumption for both FIFO consumption order
+ *  and tax classification, since we can't prove otherwise. */
+function byPurchaseDateFifo(a: Lot, b: Lot): number {
+  if (a.purchaseDate === null && b.purchaseDate === null) return 0;
+  if (a.purchaseDate === null) return 1;
+  if (b.purchaseDate === null) return -1;
+  return a.purchaseDate.localeCompare(b.purchaseDate);
+}
+
 export function previewFifoSell(
   trade: SimulatedTrade,
   lots: Lot[]
@@ -63,7 +90,7 @@ export function previewFifoSell(
   const ticker = trade.ticker.toUpperCase();
   const accountLots = lots
     .filter((l) => l.ticker === ticker && l.accountId === trade.accountId)
-    .sort((a, b) => a.purchaseDate.localeCompare(b.purchaseDate));
+    .sort(byPurchaseDateFifo);
 
   const sharesHeld = accountLots.reduce((sum, l) => sum + l.shares, 0);
   let toSell = Math.min(trade.shares, sharesHeld);
@@ -150,6 +177,7 @@ export function checkWashSale(
       triggers,
       windowClearsOn,
       isIraPermanent,
+      uncheckableLots: [],
       message: isIraPermanent
         ? `Buying ${ticker} now would trigger a wash sale — and because the repurchase is in an IRA, the loss from your ${latestSaleDate} sale is PERMANENTLY disallowed (it can never be added back to cost basis, per Rev. Rul. 2008-5). The window clears on ${windowClearsOn}.`
         : `Buying ${ticker} now would trigger a wash sale — the loss from your ${latestSaleDate} sale would be disallowed and rolled into the cost basis of these new shares. The window clears on ${windowClearsOn}.`,
@@ -165,20 +193,47 @@ export function checkWashSale(
   const remainingByLotId = new Map(
     preview.remainingLots.map((r) => [r.lot.id, r.remainingShares])
   );
+  const stillHeldAfterSale = (l: Lot): boolean =>
+    l.accountId === trade.accountId
+      ? (remainingByLotId.get(l.id) ?? 0) > 0
+      : true; // lots in other accounts are untouched by this sale
+
   const recentBuys = lots.filter((l) => {
-    if (l.ticker !== ticker) return false;
+    if (l.ticker !== ticker || l.purchaseDate === null) return false;
     const age = daysBetween(l.purchaseDate, today);
     if (age < 0 || age > WASH_SALE_WINDOW_DAYS) return false;
-    const stillHeld =
-      l.accountId === trade.accountId
-        ? (remainingByLotId.get(l.id) ?? 0) > 0
-        : true; // lots in other accounts are untouched by this sale
-    return stillHeld;
+    return stillHeldAfterSale(l);
   });
-  if (recentBuys.length === 0) return null;
+
+  // Same-ticker lots with no known purchase date that would still be held —
+  // can't be proven outside the window, so they're surfaced rather than
+  // silently passing the check (see `UncheckableLot`). Report the shares
+  // that would actually remain held, not the lot's full size — a lot in
+  // the trade's own account may be partially consumed by this very sale.
+  const uncheckableLots: UncheckableLot[] = lots
+    .filter((l) => l.ticker === ticker && l.purchaseDate === null && stillHeldAfterSale(l))
+    .map((l) => ({
+      ticker,
+      shares: l.accountId === trade.accountId ? (remainingByLotId.get(l.id) ?? 0) : l.shares,
+      accountName: l.accountName,
+    }));
+
+  if (recentBuys.length === 0) {
+    if (uncheckableLots.length === 0) return null;
+    const totalShares = uncheckableLots.reduce((sum, l) => sum + l.shares, 0);
+    return {
+      kind: "sell-with-recent-buy",
+      ticker,
+      triggers: [],
+      windowClearsOn: today,
+      isIraPermanent: false,
+      uncheckableLots,
+      message: `Can't fully check this sale for a wash sale — ${totalShares} shares of ${ticker} you'd still hold have no known purchase date (likely from a brokerage sync with limited history), so we can't confirm they were bought more than 30 days ago.`,
+    };
+  }
 
   const triggers = recentBuys.map((l) => ({
-    date: l.purchaseDate,
+    date: l.purchaseDate as string,
     accountName: l.accountName,
     description: `Bought ${l.shares} ${ticker} in ${l.accountName}`,
     isIra: isIraAccount(accounts, l.accountId),
@@ -186,7 +241,7 @@ export function checkWashSale(
   // The replacement shares are these recent buys — permanent if any sit in an IRA.
   const isIraPermanent = triggers.some((t) => t.isIra);
   const latestBuyDate = recentBuys
-    .map((l) => l.purchaseDate)
+    .map((l) => l.purchaseDate as string)
     .sort()
     .at(-1)!;
   const windowClearsOn = addDays(latestBuyDate, WASH_SALE_WINDOW_DAYS + 1);
@@ -196,6 +251,7 @@ export function checkWashSale(
     triggers,
     windowClearsOn,
     isIraPermanent,
+    uncheckableLots,
     message: isIraPermanent
       ? `Selling ${ticker} at a loss now would trigger a wash sale — you bought shares on ${latestBuyDate} in an IRA that you'd still hold, so the loss is PERMANENTLY disallowed (per Rev. Rul. 2008-5), not just deferred. The window clears on ${windowClearsOn}.`
       : `Selling ${ticker} at a loss now would trigger a wash sale — you bought shares on ${latestBuyDate} that you'd still hold, so the loss would be disallowed and added to those shares' cost basis. The window clears on ${windowClearsOn}.`,

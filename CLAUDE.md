@@ -1,5 +1,5 @@
 @AGENTS.md
-# Session handoff — READ THIS FIRST (updated 2026-08-02, evening)
+# Session handoff — READ THIS FIRST (updated 2026-08-03)
 
 Two layers below this one: **"Mission & how to work here"** (the north
 star — how to think about features and write code in this repo) and
@@ -12,11 +12,10 @@ if you need the original prose back.
 
 - **Next.js 16** (App Router, TypeScript, Tailwind), single full-stack app
   on **Supabase** (Postgres + RLS + passwordless magic-link auth) —
-  no separate backend service, no Redis, no SnapTrade yet, no shadcn/ui
-  (hand-rolled Tailwind throughout). The mission doc below originally
-  envisioned FastAPI/Python/Redis/shadcn; that's aspirational, not a
-  migration directive (explicit user decision, 2026-08-02) — this stack
-  stays.
+  no separate backend service, no Redis, no shadcn/ui (hand-rolled
+  Tailwind throughout). The mission doc below originally envisioned
+  FastAPI/Python/Redis/shadcn; that's aspirational, not a migration
+  directive (explicit user decision, 2026-08-02) — this stack stays.
 - **Deployed on Vercel**, project `atls4/ledger-check`, production URL
   `https://ledger-check-henna.vercel.app`. GitHub repo
   `tyarram262/Ledger-Check` auto-deploys on push to `main`.
@@ -24,8 +23,9 @@ if you need the original prose back.
   directly — not an OpenAI-compatible abstraction layer (a real gap
   against the AI-philosophy principle below if multi-provider ever
   matters; a reasonable simplification for now).
-- Holdings/sales are entered manually or via CSV — no brokerage sync yet
-  (Phase 2 of the roadmap below).
+- Holdings/sales: manual entry, CSV import, and (Phase 2, in progress —
+  see roadmap) SnapTrade brokerage sync via the `BrokerageProvider`
+  abstraction in `src/lib/brokerage/`.
 - **Next.js 16 renamed `middleware.ts` → `proxy.ts`** (exported fn is
   `proxy`, not `middleware` — `src/proxy.ts`). This Next.js version is
   newer than most training data; verify anything Next.js-specific against
@@ -51,7 +51,20 @@ not checked into the repo. Inspect it live (`mcp__supabase__list_tables` /
   FIFO lot consumption + sale insert, called via `supabase.rpc(...)` from
   `recordTrade.ts` (supabase-js has no client-side transaction API). It
   **hard-deletes** a lot once fully consumed — load-bearing for
-  `journal_entries`' schema design, see below.
+  `journal_entries`' schema design (its `lot_id` uses `on delete set null`
+  plus a denormalized snapshot, so an entry survives its lot's lifecycle;
+  verified directly against the live DB before shipping).
+- **Phase 2 (SnapTrade sync) additions, not yet applied live** — the
+  Supabase MCP server was unauthorized this session, so this is written
+  as SQL in the scratchpad, not run. `lots.purchase_date` becomes
+  nullable (a synced lot with no reconstructable purchase date — see
+  `reconcileLots.ts` — is `null`, never a fabricated date); `lots` gains
+  `source`/`external_key`; new tables `brokerage_connections` and
+  `snaptrade_users` (holds the SnapTrade `user_secret` — never select
+  this into a client component or log it). **Before relying on this
+  against synced lots, read `record_sell`'s current body (not in this
+  repo) and add `NULLS LAST` to its FIFO `ORDER BY purchase_date`** to
+  match `previewFifoSell`'s ordering in `washSale.ts` — not done yet.
 - **No `SUPABASE_SERVICE_ROLE_KEY` anywhere, by design.** Every RLS policy
   is written so the user's own session is sufficient. Don't introduce it
   unless a genuine admin-only operation requires it.
@@ -73,24 +86,19 @@ not checked into the repo. Inspect it live (`mcp__supabase__list_tables` /
   `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email`. Editing a
   template requires custom SMTP configured first.
 - **Custom SMTP is live via Resend** (`smtp.resend.com:465`, sender
-  `onboarding@resend.dev`). **Known limitation:** Resend sandbox mode only
-  delivers to the exact email the account was created with —
-  **`tanush.yarram@gmail.com`**. Every other address gets a hard `550`.
-  Fix: verify a domain on Resend (see roadmap below) — not urgent for
-  single-user use.
+  `onboarding@resend.dev`). The earlier sandbox-mode limitation (only
+  `tanush.yarram@gmail.com` could receive auth email) is **fixed as of
+  2026-08-03** (per user confirmation) — other addresses can now sign up.
 - Supabase Dashboard → Authentication → URL Configuration needs **Site
   URL** set to the prod domain, plus both the localhost and prod
   `/auth/confirm` origins in Additional Redirect URLs (wildcarded, e.g.
   `https://ledger-check-henna.vercel.app/**`). No MCP tool covers
   Auth/SMTP/template config — dashboard-only, user must do it.
-- **2026-08-03: discarded, not committed** — a local edit had replaced the
-  magic-link form (`src/app/login/page.tsx`) with an auto-firing
-  `supabase.auth.signInAnonymously()` guest session, plus a `layout.tsx`
-  tweak to label anonymous sessions. Reverted: anonymous sign-ins aren't
-  enabled in Supabase, every anonymous session mints a fresh `auth.uid()`
-  (orphaning the demo portfolio under RLS), and it didn't address the
-  localhost-redirect bug anyway. If a demo/guest mode is ever wanted, it
-  belongs behind an explicit opt-in button, not as the default `/login`
+- **Don't reintroduce anonymous sign-in on `/login`** — tried and reverted
+  2026-08-03 (auto-firing `signInAnonymously()`). Anonymous sign-ins
+  aren't enabled in Supabase, and every anonymous session mints a fresh
+  `auth.uid()`, orphaning the demo portfolio under RLS. A demo/guest mode
+  belongs behind an explicit opt-in button, not as default `/login`
   behavior.
 
 ## What's built vs. the MVP (current numbering, 2026-08-02)
@@ -103,108 +111,90 @@ for the full spec each row is measured against. **All 5 are now live.**
 
 | Feature | Status | Notes / gap |
 |---|---|---|
-| **Portfolio Import** (prerequisite) | Done | CSV + manual entry (`/holdings`, `csvImport.ts`). No `BrokerageProvider` abstraction yet — `queries.ts` talks to Supabase directly. Natural point to add it: Phase 2 (SnapTrade) below, not before. |
+| **Portfolio Import** (prerequisite) | Done | CSV + manual entry (`/holdings`, `csvImport.ts`), plus the `BrokerageProvider` abstraction (`src/lib/brokerage/`) as of Phase 2 slice 1 — see roadmap below. |
 | **1. Trade Check** | Live | Concentration, sector, ETF overlap, diversification/risk score deltas, overall verdict all live (`/simulate`, `simulate.ts`, `etfOverlap.ts`, `scores.ts`). Missing: estimated volatility impact (no return-series data source), position sizing, behavioral warnings. |
 | **2. Tax Check** | Live | Wash-sale warning, short-term gain warning, long-term gain countdown, estimated tax all live (`washSale.ts`, `holdingPeriod.ts`, `taxCheck.ts`). Lot selection is FIFO-only (explicitly "future" scope). Every tax figure labeled "estimate only." |
 | **3. Portfolio Health Score** | Live | **All 6 sub-scores** live and daily-persisted (`scores.ts`, `/api/health`): Diversification, Concentration, Risk, Sector Balance, Tax Efficiency, Cash Allocation → overall A–F grade. **No sub-score renders an actionable recommendation yet**, only a descriptive sentence — needs a product call on how prescriptive to get without crossing into "AI makes buy/sell decisions." |
 | **4. AI Trade Review** | Live | On-demand "second opinion" on `/simulate` (`tradeReview.ts` + `/api/trade-review` + `TradeReviewPanel.tsx`) — a devil's-advocate critique, never a buy/sell call. Stateless (no cache table); reuses the deterministic `SimulationResult` the trade-check panels already show, never computes anything itself. An optional rationale textarea makes the critique a real second opinion instead of re-narrating what's already on screen. |
 | **5. Investment Journal** | Live (v1 scope: capture + display only) | Prompted after a real buy, both the manual-entry (`LotForm.tsx`) and record-trade (`TradeSimulator.tsx`) flows; shown inline per lot in `HoldingsTable.tsx`. **Real gap in the original ask, deliberately not built:** the payoff example ("you said you wouldn't sell unless revenue growth slowed below 15%; it's still 24%") needs *fundamentals* data this app has no source for — `quotes.ts` only stores a current price. V1 instead does an honest, static "this time horizon has closed" line, derived from a structured time-horizon field, with no dashboard-level nudges, dismissal state, or entry editing yet. |
 
-**This session (2026-08-02, evening) added:** AI Trade Review and
-Investment Journal (both above), Risk promoted to the 6th daily health
-sub-score (`riskScore` now called from `computeAndPersistHealth`, weights
-rebalanced, `overall` now divides by a computed weight total instead of a
-hardcoded 100), and a bug fix: **`/api/simulate` never fetched the user's
-tax profile from `/settings`**, so every Tax Check estimate silently used
-the single-filer/$0-income default regardless of what was configured —
-fixed via a new shared `tradeContext.ts` (`parseTradeBody` +
-`runSimulation`) that both `/api/simulate` and `/api/trade-review` now
-call, so this can't drift out of sync between routes again.
+A few facts worth knowing that aren't obvious from the code:
 
-**Investment Journal's schema constraint, worth knowing before touching
-it:** `record_sell` hard-deletes a lot once fully consumed by a sell, and
-the Remove button hard-deletes on request. `journal_entries.lot_id` uses
-`on delete set null` (not a plain FK, not cascade) plus a denormalized
-ticker/account/shares/cost/purchase-date snapshot, so an entry survives
-its lot's lifecycle instead of either breaking the sell or being
-destroyed exactly when it becomes most valuable. Verified directly
-against the live DB (a scratch insert → full-lot-delete → check → clean
-up) before shipping.
-
-Trade Check / Tax Check / Portfolio Health shipped earlier the same day:
-ETF look-through overlap (`etfOverlap.ts` + `src/data/etf-holdings.json`,
-static top-holdings snapshot for 24 ETFs — flags near-duplicate funds and
-"true" exposure through funds you hold) and IRA sells returning **zeroed
-tax figures with an explanation, never a fabricated number**. Tax
-efficiency is computed from **unrealized** lot data only — `sales` has no
-acquisition date, so realized short/long-term can't be reconstructed
-without a schema + `record_sell` change. Schema: `accounts.cash_balance`,
-`settings.{filing_status,annual_taxable_income,state_tax_rate}`,
-`health_snapshots` (migrations `mvp_cash_tax_profile_health`,
-`health_snapshots_risk`, `journal_entries`,
-`journal_entries_account_id_idx`).
-
-The AI-philosophy example sentences below ("You already own similar
-exposure through QQQ") are **already produced deterministically**, not by
-an LLM — `etfOverlap.ts` and `concentration.ts` generate near-verbatim
-variants. `digest.ts` and `tradeReview.ts` are the only two places that
-actually call Claude, and both only narrate/critique numbers computed
-elsewhere — never compute anything themselves.
+- ETF look-through overlap (`etfOverlap.ts` + `src/data/etf-holdings.json`,
+  a static top-holdings snapshot for 24 ETFs) flags near-duplicate funds
+  and "true" exposure through funds you already hold. IRA sells return
+  **zeroed tax figures with an explanation, never a fabricated number**.
+- Tax efficiency is computed from **unrealized** lot data only — `sales`
+  has no acquisition date, so realized short/long-term can't be
+  reconstructed without a schema + `record_sell` change.
+- The `/api/simulate` tax profile bug (fixed 2026-08-02): it never
+  fetched the user's `/settings` tax profile, so every Tax Check estimate
+  silently used the single-filer/$0-income default. Fixed via a shared
+  `tradeContext.ts` (`parseTradeBody` + `runSimulation`) that both
+  `/api/simulate` and `/api/trade-review` call, so the two routes can't
+  drift out of sync again.
+- The AI-philosophy example sentences below ("You already own similar
+  exposure through QQQ") are **already produced deterministically**, not
+  by an LLM — `etfOverlap.ts` and `concentration.ts` generate near-
+  verbatim variants. `digest.ts` and `tradeReview.ts` are the only two
+  places that actually call Claude, and both only narrate/critique
+  numbers computed elsewhere.
 
 ## Verification log
 
-**Phase 1 / auth (verified 2026-07-31, real browser):** Full authenticated
-pass against live Supabase — real signup email clicked, every API route
-exercised with a real session (CRUD, CSV import, `record_sell` FIFO RPC,
-settings, quote refresh, digest), wash-sale engine checked against real
-DB-backed data (IRA-permanent, deferred cross-account, correctly-not-
-flagged, both buy-after-loss flavors). `tsc`/`eslint`/50 tests clean.
+**All v1 features: fully verified as of 2026-08-03**, including a real
+authenticated browser click-through on both local and the Vercel
+deployment (user-confirmed) — the health score (6 sub-scores), trade-check
+panels (incl. AI second opinion + rationale textarea), tax-check panel
+(incl. IRA zero-tax case), settings tax-profile form, and the journal
+prompt on both manual and recorded-simulator buys. This closes out what
+had been the standing gap through 2026-08-02 (unit/DB-tested but never
+browser-verified, due to no stored browser session or inbox access in
+that environment).
 
-**MVP features (2026-08-02, morning): unit-tested, not yet browser-verified.**
-131 tests passing (117 new), `tsc`/`eslint`/`next build` clean, Supabase
-advisors clean, prod curl-verified live (`/` → 307 to `/login`, `/login`
-→ 200).
+Underlying test/build state as of the last full pass: 146 tests passing,
+`tsc`/`eslint`/`next build` clean, Supabase advisors clean. Phase 1 auth
+was additionally verified end-to-end against live Supabase on
+2026-07-31 (real signup email, every API route with a real session,
+wash-sale engine against real DB-backed data). The one DB-level subtlety
+worth remembering: `journal_entries.lot_id`'s `on delete set null`
+behavior (see Database section above) was confirmed with a real insert →
+full-lot-delete → check → clean-up against the live database, not just
+assumed from the schema.
 
-**AI Trade Review / Investment Journal / Risk sub-score (2026-08-02,
-evening): unit-tested + DB-verified, not yet browser-verified.** 146
-tests passing (15 new — `addMonths` boundary cases, `journal.ts`'s
-horizon math, a tax-profile regression test), `tsc`/`eslint`/`next build`
-clean, Supabase advisors clean. Went further than the morning session on
-DB-level verification specifically because this slice touched `ON DELETE`
-semantics: ran a real insert → full-lot-delete → check → clean up against
-the live database to confirm `journal_entries.lot_id` survives as NULL
-rather than erroring or cascading, and curl-smoke-tested that
-`/api/journal`, `/api/trade-review`, and `/api/health` all correctly
-307-redirect when unauthenticated, same as every existing route.
-
-**No authenticated click-through was possible either session** (no stored
-browser session, no inbox access for the magic-link email — a standing
-environment limitation, not something that's been tried and failed).
-**Next person: sign in as `tanush.yarram@gmail.com` and click through the
-health score (now 6 sub-scores), the trade-check panels (incl. the "AI
-second opinion" button and rationale textarea), the tax-check panel
-(incl. the IRA zero-tax case), the settings tax-profile form, and the
-journal prompt on both a manual buy and a recorded simulator trade (incl.
-Skip on each) before trusting the UI layer** — logic is solid and the one
-DB constraint that mattered has been verified directly, but rendering and
-interaction flow haven't been looked at with real eyes.
-
-Demo data exists under `tanush.yarram@gmail.com` (**use this one** — the
-only address Resend's sandbox can currently email) and, separately, an
-older copy under `tanush.yarram@icloud.com` (unreachable until a Resend
-domain is verified). Both: 4 accounts spanning taxable/Roth/traditional-
-IRA, holdings weighted so Information Technology trips the concentration
-threshold, sales realizing IRA-permanent + deferred + buy-after-loss
-wash-sale scenarios.
+Demo data exists under `tanush.yarram@gmail.com` and, separately, an
+older copy under `tanush.yarram@icloud.com`. Both: 4 accounts spanning
+taxable/Roth/traditional-IRA, holdings weighted so Information Technology
+trips the concentration threshold, sales realizing IRA-permanent +
+deferred + buy-after-loss wash-sale scenarios.
 
 ## The 4-phase roadmap to production readiness
 
-1. **Hostable at all** (auth + hosted DB + deploy) — **closed 2026-07-31.**
-   Caveat carried forward: Resend sandbox mode limits which address can
-   receive auth emails — fix by verifying a domain, worth bundling with
-   Phase 4.
+1. **Hostable at all** (auth + hosted DB + deploy) — **closed.** Auth
+   verified end-to-end incl. the Resend sandbox limitation (see Auth flow
+   above).
 2. **Cut onboarding friction** — SnapTrade brokerage sync, replacing
-   manual/CSV entry. Not started.
+   manual/CSV entry. **Slice 1 (connect + holdings + cash) code-complete,
+   not yet run against a live SnapTrade account (2026-08-03).** Built:
+   `BrokerageProvider` abstraction (`src/lib/brokerage/types.ts`),
+   `reconcileLots.ts`'s tax-lot/activity-replay/residual reconciliation
+   (12 unit tests), the `snaptrade.ts` adapter (`snaptrade-typescript-sdk`
+   — pure JS, no native build step, safe for this Mac), the orchestration
+   layer (`sync.ts`) and its five `/api/brokerage/*` routes, a
+   `BrokerageConnect` UI on `/holdings` (full-redirect to the Connection
+   Portal, not the iframe flow), and the `purchase_date` nullability
+   change threaded through every consumer (`washSale.ts`, `taxCheck.ts`,
+   `scores.ts`) with visible "Unknown" caveats in the UI rather than a
+   fabricated date. Gated behind `SNAPTRADE_CLIENT_ID`/
+   `SNAPTRADE_CONSUMER_KEY` — absent either, `BrokerageConnect` renders
+   nothing and the routes 501, so nothing regresses today. 169 tests
+   passing, `tsc`/`eslint`/`next build` clean. **Not done:** the schema
+   migration is written but not applied live (Supabase MCP was
+   unauthorized this session — see Database section above), no SnapTrade
+   account exists yet to exercise the HTTP client end-to-end, and
+   `record_sell`'s FIFO ordering hasn't been checked against synced lots.
+   Sales-history import, scheduled re-sync, and disconnect handling are
+   an explicit follow-up, not this slice.
 3. **Trust & polish** — Sentry, rate-limit the digest endpoint, encrypt
    brokerage tokens (once Phase 2 lands) + a real privacy policy/ToS. Not
    started.

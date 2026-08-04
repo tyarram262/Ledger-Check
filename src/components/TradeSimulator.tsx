@@ -247,6 +247,13 @@ export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
                 ))}
               </ul>
               <p className="mt-2 text-sm text-red-700">{result.washSale.message}</p>
+              {result.washSale.uncheckableLots.length > 0 && (
+                <p className="mt-2 text-sm text-amber-700">
+                  Additionally, {result.washSale.uncheckableLots.reduce((sum, l) => sum + l.shares, 0)}{" "}
+                  {result.washSale.uncheckableLots[0].ticker} shares (synced with no known purchase
+                  date) couldn&apos;t be checked against the 30-day window.
+                </p>
+              )}
               {result.washSale.isIraPermanent ? (
                 <p className="mt-2 text-xs text-red-600">
                   This is worse than a same-taxable-account wash sale: because

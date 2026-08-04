@@ -11,6 +11,7 @@ export function makeLot(over: Partial<Lot> = {}): Lot {
     shares: 10,
     costPerShare: 100,
     purchaseDate: "2025-01-01",
+    source: "manual",
     ...over,
   };
 }

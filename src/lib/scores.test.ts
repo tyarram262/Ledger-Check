@@ -160,6 +160,16 @@ describe("taxEfficiencyScore", () => {
     const result = taxEfficiencyScore(lots, prices, ACCOUNTS, DEFAULT_TAX_PROFILE, TODAY);
     expect(result.score).toBe(100);
   });
+
+  it("excludes a gain on a null-purchase-date lot from the score and mentions it in the sentence, rather than guessing its term", () => {
+    const lots: Lot[] = [makeLot({ ticker: "KO", shares: 10, costPerShare: 50, purchaseDate: null, accountId: 1 })];
+    const prices = new Map([["KO", 90]]);
+    const result = taxEfficiencyScore(lots, prices, ACCOUNTS, DEFAULT_TAX_PROFILE, TODAY);
+    // No classifiable gains and nothing to harvest -> component A and B are
+    // both perfect; the unknown-dated gain isn't held against the score.
+    expect(result.score).toBe(100);
+    expect(result.sentence).toContain("no known purchase date");
+  });
 });
 
 describe("cashAllocationScore", () => {

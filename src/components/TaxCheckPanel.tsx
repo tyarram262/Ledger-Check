@@ -25,6 +25,10 @@ export default function TaxCheckPanel({ taxCheck }: { taxCheck: TaxCheckResult }
             <p className="mt-2 text-sm text-amber-700">{taxCheck.shortTermWarning}</p>
           )}
 
+          {taxCheck.unknownTermWarning && (
+            <p className="mt-2 text-sm text-amber-700">{taxCheck.unknownTermWarning}</p>
+          )}
+
           {taxCheck.longTermCountdown && (
             <p className="mt-2 text-sm text-sky-700">
               Wait {taxCheck.longTermCountdown.daysAway} more day

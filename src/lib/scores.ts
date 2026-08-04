@@ -215,12 +215,22 @@ export function taxEfficiencyScore(
   let shortTermGainValue = 0;
   let totalGainValue = 0;
   let unharvestedLossValue = 0;
+  // Gains on lots with no known purchase date (a brokerage sync with
+  // shallow history — see `types.ts`'s `Lot`) can't be classified short- vs.
+  // long-term, so they're excluded from this component entirely rather than
+  // guessed either way; `unknownTermGainValue` only feeds the sentence.
+  let unknownTermGainValue = 0;
   for (const l of taxableLots) {
     const price = prices.get(l.ticker) ?? l.costPerShare;
     const gainLoss = (price - l.costPerShare) * l.shares;
     if (gainLoss > 0) {
-      totalGainValue += gainLoss;
-      if (termFor(l.purchaseDate, today) === "short") shortTermGainValue += gainLoss;
+      const term = termFor(l.purchaseDate, today);
+      if (term === "unknown") {
+        unknownTermGainValue += gainLoss;
+      } else {
+        totalGainValue += gainLoss;
+        if (term === "short") shortTermGainValue += gainLoss;
+      }
     } else if (gainLoss < 0) {
       unharvestedLossValue += -gainLoss;
     }
@@ -253,6 +263,9 @@ export function taxEfficiencyScore(
   }
   if (fixedIncomeTotal > 0 && fixedIncomeTaxable > 0) {
     sentenceParts.push("Some fixed-income holdings sit in taxable accounts rather than tax-sheltered ones.");
+  }
+  if (unknownTermGainValue > 1e-9) {
+    sentenceParts.push(`$${unknownTermGainValue.toFixed(0)} of gains are on lots with no known purchase date and aren't reflected in this score.`);
   }
   const sentence = sentenceParts.length > 0 ? sentenceParts.join(" ") : "No obvious tax-efficiency issues in your current positions.";
 

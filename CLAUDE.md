@@ -1,5 +1,5 @@
 @AGENTS.md
-# Session handoff — READ THIS FIRST (updated 2026-08-03)
+# Session handoff — READ THIS FIRST (updated 2026-08-05)
 
 Two layers below this one: **"Mission & how to work here"** (the north
 star — how to think about features and write code in this repo) and
@@ -182,8 +182,9 @@ deferred + buy-after-loss wash-sale scenarios.
    verified end-to-end incl. the Resend sandbox limitation (see Auth flow
    above).
 2. **Cut onboarding friction** — SnapTrade brokerage sync, replacing
-   manual/CSV entry. **Slice 1 (connect + holdings + cash) unblocked and
-   partially live-verified 2026-08-04.** Built: `BrokerageProvider`
+   manual/CSV entry. **Slice 1 (connect + holdings + cash) fully
+   live-verified 2026-08-04/05, including a real browser click-through
+   (user-confirmed).** Built: `BrokerageProvider`
    abstraction (`src/lib/brokerage/types.ts`),
    `reconcileLots.ts`'s tax-lot/activity-replay/residual reconciliation
    (12 unit tests), the `snaptrade.ts` adapter (`snaptrade-typescript-sdk`
@@ -211,12 +212,28 @@ deferred + buy-after-loss wash-sale scenarios.
    against the live API with a throwaway test user (then deleted via
    `deleteSnapTradeUser`) — both response shapes matched the adapter's
    code exactly, including the `{ redirectURI, sessionId }` narrowing in
-   `connectionPortalUrl`. **Not done:** the actual browser click-through
-   of the Connection Portal (filling in the Sandbox institution's test
-   credentials) — this requires a real user's authenticated session and
-   a browser, neither of which this environment had; `listUserAccounts`/
-   `fetchHoldings`/`reconcileLots` are therefore still unverified against
-   real sandbox data. Sales-history import, scheduled re-sync, and
+   `connectionPortalUrl`. The user then completed the actual browser
+   click-through — linked SnapTrade's simulated `SANDBOX` institution
+   across both a taxable and a traditional-IRA account, producing real
+   rows: 1 `snaptrade_users`, 1 `brokerage_connections`
+   (`brokerage_name: "sandbox"`), 2 `accounts` (`sync_source:
+   'snaptrade'`), 5 `lots`. **Confirmed `listUserAccounts` /
+   `fetchHoldings` / `reconcileLots` all work against real data** — 2 of
+   the 5 lots came back with a full tax-lot/activity match (real
+   `purchase_date`), 3 came back with only a live position and no
+   reconstructable history, correctly falling through to
+   `reconcileLots`'s `position-residual` branch (`external_key:
+   "TICKER:residual"`, `purchase_date: null`) rather than a fabricated
+   date — the first real exercise of that path.
+
+   Re-ran `washSale.ts`/`taxCheck.ts` against this exact live dataset
+   (temporary test, not committed): selling part of a null-dated lot at
+   a loss correctly returns the `uncheckableLots` wash-sale warning
+   instead of a silent pass; a null-dated sell's gain/loss is excluded
+   from `shortTermGainLoss`/`longTermGainLoss`/`estimatedTax` and
+   surfaced via `unknownTermWarning` instead; the IRA account
+   (`traditional_ira`) zeroes every dollar figure regardless of the null
+   date, as designed. Sales-history import, scheduled re-sync, and
    disconnect handling remain an explicit follow-up, not this slice.
 3. **Trust & polish** — Sentry, rate-limit the digest endpoint, encrypt
    brokerage tokens (once Phase 2 lands) + a real privacy policy/ToS. Not

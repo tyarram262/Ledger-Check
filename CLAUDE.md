@@ -54,17 +54,25 @@ not checked into the repo. Inspect it live (`mcp__supabase__list_tables` /
   `journal_entries`' schema design (its `lot_id` uses `on delete set null`
   plus a denormalized snapshot, so an entry survives its lot's lifecycle;
   verified directly against the live DB before shipping).
-- **Phase 2 (SnapTrade sync) additions, not yet applied live** — the
-  Supabase MCP server was unauthorized this session, so this is written
-  as SQL in the scratchpad, not run. `lots.purchase_date` becomes
-  nullable (a synced lot with no reconstructable purchase date — see
-  `reconcileLots.ts` — is `null`, never a fabricated date); `lots` gains
-  `source`/`external_key`; new tables `brokerage_connections` and
-  `snaptrade_users` (holds the SnapTrade `user_secret` — never select
-  this into a client component or log it). **Before relying on this
-  against synced lots, read `record_sell`'s current body (not in this
-  repo) and add `NULLS LAST` to its FIFO `ORDER BY purchase_date`** to
-  match `previewFifoSell`'s ordering in `washSale.ts` — not done yet.
+- **Phase 2 (SnapTrade sync) additions — applied live 2026-08-04.**
+  `lots.purchase_date` is now nullable (a synced lot with no
+  reconstructable purchase date — see `reconcileLots.ts` — is `null`,
+  never a fabricated date); `lots` gained `source`/`external_key` (plain
+  `UNIQUE` on `(account_id, external_key)`, **not** a partial index —
+  supabase-js's `{ onConflict: "account_id,external_key" }` compiles to
+  `ON CONFLICT (account_id, external_key)` with no predicate, which
+  Postgres can only resolve against a non-partial unique constraint;
+  NULLs still coexist freely since Postgres treats them as distinct);
+  new tables `brokerage_connections` and `snaptrade_users` (holds the
+  SnapTrade `user_secret` — never select this into a client component or
+  log it), both RLS-scoped like every other table; `accounts` gained
+  `snaptrade_account_id`/`connection_id`/`sync_source`, same
+  plain-`UNIQUE` treatment on `(user_id, snaptrade_account_id)`.
+  `record_sell`'s FIFO `ORDER BY` now reads
+  `purchase_date asc nulls last, id asc` — confirmed this matches
+  `previewFifoSell`'s ordering in `washSale.ts` (Postgres already
+  defaulted `ASC` to `NULLS LAST`, so this was a no-op behaviorally, just
+  made explicit so the two orderings don't drift apart by accident later).
 - **No `SUPABASE_SERVICE_ROLE_KEY` anywhere, by design.** Every RLS policy
   is written so the user's own session is sufficient. Don't introduce it
   unless a genuine admin-only operation requires it.
@@ -174,9 +182,9 @@ deferred + buy-after-loss wash-sale scenarios.
    verified end-to-end incl. the Resend sandbox limitation (see Auth flow
    above).
 2. **Cut onboarding friction** — SnapTrade brokerage sync, replacing
-   manual/CSV entry. **Slice 1 (connect + holdings + cash) code-complete,
-   not yet run against a live SnapTrade account (2026-08-03).** Built:
-   `BrokerageProvider` abstraction (`src/lib/brokerage/types.ts`),
+   manual/CSV entry. **Slice 1 (connect + holdings + cash) unblocked and
+   partially live-verified 2026-08-04.** Built: `BrokerageProvider`
+   abstraction (`src/lib/brokerage/types.ts`),
    `reconcileLots.ts`'s tax-lot/activity-replay/residual reconciliation
    (12 unit tests), the `snaptrade.ts` adapter (`snaptrade-typescript-sdk`
    — pure JS, no native build step, safe for this Mac), the orchestration
@@ -186,15 +194,30 @@ deferred + buy-after-loss wash-sale scenarios.
    change threaded through every consumer (`washSale.ts`, `taxCheck.ts`,
    `scores.ts`) with visible "Unknown" caveats in the UI rather than a
    fabricated date. Gated behind `SNAPTRADE_CLIENT_ID`/
-   `SNAPTRADE_CONSUMER_KEY` — absent either, `BrokerageConnect` renders
-   nothing and the routes 501, so nothing regresses today. 169 tests
-   passing, `tsc`/`eslint`/`next build` clean. **Not done:** the schema
-   migration is written but not applied live (Supabase MCP was
-   unauthorized this session — see Database section above), no SnapTrade
-   account exists yet to exercise the HTTP client end-to-end, and
-   `record_sell`'s FIFO ordering hasn't been checked against synced lots.
-   Sales-history import, scheduled re-sync, and disconnect handling are
-   an explicit follow-up, not this slice.
+   `SNAPTRADE_CONSUMER_KEY`, now set in both `.env.local` and Vercel
+   production — absent either, `BrokerageConnect` still renders nothing
+   and the routes still 501. 169 tests passing,
+   `tsc`/`eslint`/`next build` clean.
+
+   **The credentials are a SnapTrade commercial *test* key**
+   (`getPartnerInfo` → `name: "Ledger-Check Test"`, `is_personal: false`),
+   confirming `snaptrade.ts`'s hardcoded `SnaptradeAuth.commercialApiKey`
+   mode is correct. Test keys only reach SnapTrade's simulated `SANDBOX`
+   institution (confirmed present in the 37 allowed brokerages) —
+   **no real brokerage (Fidelity/Schwab/Robinhood/etc.) can be connected
+   until a production key is approved**, in prod or locally. The schema
+   migration is applied live (see Database section above) and
+   `registerSnapTradeUser` / `loginSnapTradeUser` were exercised directly
+   against the live API with a throwaway test user (then deleted via
+   `deleteSnapTradeUser`) — both response shapes matched the adapter's
+   code exactly, including the `{ redirectURI, sessionId }` narrowing in
+   `connectionPortalUrl`. **Not done:** the actual browser click-through
+   of the Connection Portal (filling in the Sandbox institution's test
+   credentials) — this requires a real user's authenticated session and
+   a browser, neither of which this environment had; `listUserAccounts`/
+   `fetchHoldings`/`reconcileLots` are therefore still unverified against
+   real sandbox data. Sales-history import, scheduled re-sync, and
+   disconnect handling remain an explicit follow-up, not this slice.
 3. **Trust & polish** — Sentry, rate-limit the digest endpoint, encrypt
    brokerage tokens (once Phase 2 lands) + a real privacy policy/ToS. Not
    started.

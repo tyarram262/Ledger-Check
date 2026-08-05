@@ -18,14 +18,18 @@ if you need the original prose back.
   directive (explicit user decision, 2026-08-02) — this stack stays.
 - **Deployed on Vercel**, project `atls4/ledger-check`, production URL
   `https://ledger-check-henna.vercel.app`. GitHub repo
-  `tyarram262/Ledger-Check` auto-deploys on push to `main`.
-- AI digest calls **Claude** (`claude-haiku-4-5` via `@anthropic-ai/sdk`)
-  directly — not an OpenAI-compatible abstraction layer (a real gap
-  against the AI-philosophy principle below if multi-provider ever
-  matters; a reasonable simplification for now).
-- Holdings/sales: manual entry, CSV import, and (Phase 2, in progress —
-  see roadmap) SnapTrade brokerage sync via the `BrokerageProvider`
-  abstraction in `src/lib/brokerage/`.
+  `tyarram262/Ledger-Check` auto-deploys on push to `main`. Prod and
+  local share the same single Supabase project (one `NEXT_PUBLIC_SUPABASE_URL`
+  everywhere) — there is no separate prod database.
+- AI digest and trade review call **Claude** (`claude-haiku-4-5` via
+  `@anthropic-ai/sdk`) directly — not an OpenAI-compatible abstraction
+  layer (a real gap against the AI-philosophy principle below if
+  multi-provider ever matters; a reasonable simplification for now). Both
+  Claude-calling endpoints share a Postgres-backed rate limit — see
+  Database section.
+- Holdings/sales: manual entry, CSV import, and SnapTrade brokerage sync
+  via the `BrokerageProvider` abstraction in `src/lib/brokerage/` — see
+  roadmap Phase 2 below.
 - **Next.js 16 renamed `middleware.ts` → `proxy.ts`** (exported fn is
   `proxy`, not `middleware` — `src/proxy.ts`). This Next.js version is
   newer than most training data; verify anything Next.js-specific against
@@ -52,79 +56,83 @@ not checked into the repo. Inspect it live (`mcp__supabase__list_tables` /
   `recordTrade.ts` (supabase-js has no client-side transaction API). It
   **hard-deletes** a lot once fully consumed — load-bearing for
   `journal_entries`' schema design (its `lot_id` uses `on delete set null`
-  plus a denormalized snapshot, so an entry survives its lot's lifecycle;
-  verified directly against the live DB before shipping).
-- **Phase 2 (SnapTrade sync) additions — applied live 2026-08-04.**
-  `lots.purchase_date` is now nullable (a synced lot with no
-  reconstructable purchase date — see `reconcileLots.ts` — is `null`,
-  never a fabricated date); `lots` gained `source`/`external_key` (plain
-  `UNIQUE` on `(account_id, external_key)`, **not** a partial index —
-  supabase-js's `{ onConflict: "account_id,external_key" }` compiles to
-  `ON CONFLICT (account_id, external_key)` with no predicate, which
-  Postgres can only resolve against a non-partial unique constraint;
+  plus a denormalized snapshot, so an entry survives its lot's lifecycle).
+  FIFO ordering is `purchase_date asc nulls last, id asc`, matching
+  `previewFifoSell`'s ordering in `washSale.ts`.
+- **SnapTrade brokerage sync (Phase 2).** `lots.purchase_date` is nullable
+  (a synced lot with no reconstructable purchase date — see
+  `reconcileLots.ts` — is `null`, never a fabricated date); `lots` has
+  `source`/`external_key` (plain `UNIQUE` on `(account_id, external_key)`,
+  **not** a partial index — supabase-js's `{ onConflict: "account_id,external_key" }`
+  compiles to `ON CONFLICT (account_id, external_key)` with no predicate,
+  which Postgres can only resolve against a non-partial unique constraint;
   NULLs still coexist freely since Postgres treats them as distinct);
-  new tables `brokerage_connections` and `snaptrade_users` (holds the
-  SnapTrade `user_secret` — never select this into a client component or
-  log it), both RLS-scoped like every other table; `accounts` gained
+  `brokerage_connections` and `snaptrade_users` (holds the SnapTrade
+  `user_secret`, **encrypted at rest** — see `src/lib/encryption.ts` and
+  `queries.ts`'s `getSnapTradeCredentials`/`saveSnapTradeCredentials`;
+  never select the raw column into a client component or log it), both
+  RLS-scoped like every other table; `accounts` has
   `snaptrade_account_id`/`connection_id`/`sync_source`, same
   plain-`UNIQUE` treatment on `(user_id, snaptrade_account_id)`.
-  `record_sell`'s FIFO `ORDER BY` now reads
-  `purchase_date asc nulls last, id asc` — confirmed this matches
-  `previewFifoSell`'s ordering in `washSale.ts` (Postgres already
-  defaulted `ASC` to `NULLS LAST`, so this was a no-op behaviorally, just
-  made explicit so the two orderings don't drift apart by accident later).
+  `brokerage_connections.disabled` exists but is **never written** —
+  detecting a broken/revoked connection needs scheduled re-sync or a
+  `listBrokerageAuthorizations` poll, neither of which exist yet (Phase 2
+  follow-up, not started).
+- `ai_rate_limits` — one row per user, backing `check_ai_rate_limit(...)`
+  (a `record_sell`-style `SECURITY INVOKER` function with `for update`
+  row locking), a fixed-window counter shared across `/api/digest` and
+  `/api/trade-review` (5 combined Claude calls/hour/user, see
+  `src/lib/aiRateLimit.ts`). No Redis — Postgres is the only shared store
+  by design.
 - **No `SUPABASE_SERVICE_ROLE_KEY` anywhere, by design.** Every RLS policy
   is written so the user's own session is sufficient. Don't introduce it
   unless a genuine admin-only operation requires it.
 
-## Auth flow (working end to end as of 2026-08-03)
+## Auth flow
 
 - `src/proxy.ts` + `src/lib/supabase/proxy.ts` gate every route except
   `/login` and `/auth/*`.
 - `login/actions.ts` derives `emailRedirectTo` from the request's `Origin`
   header so one Supabase project serves both localhost and prod (Supabase
-  only has one `Site URL`) — now hard-fails with a user-facing error if
+  only has one `Site URL`) — hard-fails with a user-facing error if
   `Origin` is missing, rather than silently falling back to Site URL.
 - Two email templates matter: Supabase's **"Confirm signup"** (new
   address) and **"Magic Link"** (returning). Both use PKCE-style links.
   **Both must render `{{ .RedirectTo }}`, not `{{ .SiteURL }}`** —
   `.SiteURL` ignores `emailRedirectTo` entirely and always resolves to the
-  project's single configured Site URL, which is what caused prod sign-ins
-  to land on `localhost` (fixed 2026-08-03). Template link shape:
+  project's single configured Site URL, which will otherwise send every
+  prod sign-in to `localhost`. Template link shape:
   `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email`. Editing a
   template requires custom SMTP configured first.
 - **Custom SMTP is live via Resend** (`smtp.resend.com:465`, sender
-  `onboarding@resend.dev`). The earlier sandbox-mode limitation (only
-  `tanush.yarram@gmail.com` could receive auth email) is **fixed as of
-  2026-08-03** (per user confirmation) — other addresses can now sign up.
+  `onboarding@resend.dev`) — any address can sign up, not just the
+  account owner's.
 - Supabase Dashboard → Authentication → URL Configuration needs **Site
   URL** set to the prod domain, plus both the localhost and prod
   `/auth/confirm` origins in Additional Redirect URLs (wildcarded, e.g.
   `https://ledger-check-henna.vercel.app/**`). No MCP tool covers
   Auth/SMTP/template config — dashboard-only, user must do it.
-- **Don't reintroduce anonymous sign-in on `/login`** — tried and reverted
-  2026-08-03 (auto-firing `signInAnonymously()`). Anonymous sign-ins
-  aren't enabled in Supabase, and every anonymous session mints a fresh
+- **Don't reintroduce anonymous sign-in on `/login`** — tried and
+  reverted (auto-firing `signInAnonymously()`). Anonymous sign-ins aren't
+  enabled in Supabase, and every anonymous session mints a fresh
   `auth.uid()`, orphaning the demo portfolio under RLS. A demo/guest mode
   belongs behind an explicit opt-in button, not as default `/login`
   behavior.
 
-## What's built vs. the MVP (current numbering, 2026-08-02)
+## What's built vs. the MVP
 
-Portfolio Import is the foundation everything else sits on, not one of the
-"5" below anymore — it's done and unremarkable enough to not need its own
-slot. The 5 features are Trade Check / Tax Check / Portfolio Health / AI
-Trade Review / Investment Journal, in build order — see "MVP scope" below
-for the full spec each row is measured against. **All 5 are now live.**
+Portfolio Import is the foundation everything else sits on, not one of
+the "5" below — it's done and unremarkable enough to not need its own
+slot. **All 5 MVP features are live.**
 
 | Feature | Status | Notes / gap |
 |---|---|---|
-| **Portfolio Import** (prerequisite) | Done | CSV + manual entry (`/holdings`, `csvImport.ts`), plus the `BrokerageProvider` abstraction (`src/lib/brokerage/`) as of Phase 2 slice 1 — see roadmap below. |
+| **Portfolio Import** (prerequisite) | Done | CSV + manual entry (`/holdings`, `csvImport.ts`), plus the `BrokerageProvider` abstraction (`src/lib/brokerage/`) — see roadmap. |
 | **1. Trade Check** | Live | Concentration, sector, ETF overlap, diversification/risk score deltas, overall verdict all live (`/simulate`, `simulate.ts`, `etfOverlap.ts`, `scores.ts`). Missing: estimated volatility impact (no return-series data source), position sizing, behavioral warnings. |
-| **2. Tax Check** | Live | Wash-sale warning, short-term gain warning, long-term gain countdown, estimated tax all live (`washSale.ts`, `holdingPeriod.ts`, `taxCheck.ts`). Lot selection is FIFO-only (explicitly "future" scope). Every tax figure labeled "estimate only." |
-| **3. Portfolio Health Score** | Live | **All 6 sub-scores** live and daily-persisted (`scores.ts`, `/api/health`): Diversification, Concentration, Risk, Sector Balance, Tax Efficiency, Cash Allocation → overall A–F grade. **No sub-score renders an actionable recommendation yet**, only a descriptive sentence — needs a product call on how prescriptive to get without crossing into "AI makes buy/sell decisions." |
+| **2. Tax Check** | Live | Wash-sale warning, short-term gain warning, long-term gain countdown, estimated tax all live (`washSale.ts`, `holdingPeriod.ts`, `taxCheck.ts`). Lot selection is FIFO-only. Every tax figure labeled "estimate only." |
+| **3. Portfolio Health Score** | Live | **All 6 sub-scores** live and daily-persisted (`scores.ts`, `/api/health`): Diversification, Concentration, Risk, Sector Balance, Tax Efficiency, Cash Allocation → overall A–F grade. **No sub-score renders an actionable recommendation yet**, only a descriptive sentence (`SubScore.sentence`) — needs a product call on how prescriptive to get without crossing into "AI makes buy/sell decisions." |
 | **4. AI Trade Review** | Live | On-demand "second opinion" on `/simulate` (`tradeReview.ts` + `/api/trade-review` + `TradeReviewPanel.tsx`) — a devil's-advocate critique, never a buy/sell call. Stateless (no cache table); reuses the deterministic `SimulationResult` the trade-check panels already show, never computes anything itself. An optional rationale textarea makes the critique a real second opinion instead of re-narrating what's already on screen. |
-| **5. Investment Journal** | Live (v1 scope: capture + display only) | Prompted after a real buy, both the manual-entry (`LotForm.tsx`) and record-trade (`TradeSimulator.tsx`) flows; shown inline per lot in `HoldingsTable.tsx`. **Real gap in the original ask, deliberately not built:** the payoff example ("you said you wouldn't sell unless revenue growth slowed below 15%; it's still 24%") needs *fundamentals* data this app has no source for — `quotes.ts` only stores a current price. V1 instead does an honest, static "this time horizon has closed" line, derived from a structured time-horizon field, with no dashboard-level nudges, dismissal state, or entry editing yet. |
+| **5. Investment Journal** | Live (v1 scope: capture + display only) | Prompted after a real buy, both the manual-entry (`LotForm.tsx`) and record-trade (`TradeSimulator.tsx`) flows; shown inline per lot in `HoldingsTable.tsx`. **Real gap, deliberately not built:** the payoff example ("you said you wouldn't sell unless revenue growth slowed below 15%; it's still 24%") needs *fundamentals* data this app has no source for — `quotes.ts` only stores a current price. V1 instead does an honest, static "this time horizon has closed" line, with no dashboard-level nudges, dismissal state, or entry editing yet. |
 
 A few facts worth knowing that aren't obvious from the code:
 
@@ -135,40 +143,29 @@ A few facts worth knowing that aren't obvious from the code:
 - Tax efficiency is computed from **unrealized** lot data only — `sales`
   has no acquisition date, so realized short/long-term can't be
   reconstructed without a schema + `record_sell` change.
-- The `/api/simulate` tax profile bug (fixed 2026-08-02): it never
-  fetched the user's `/settings` tax profile, so every Tax Check estimate
-  silently used the single-filer/$0-income default. Fixed via a shared
-  `tradeContext.ts` (`parseTradeBody` + `runSimulation`) that both
-  `/api/simulate` and `/api/trade-review` call, so the two routes can't
-  drift out of sync again.
-- The AI-philosophy example sentences below ("You already own similar
-  exposure through QQQ") are **already produced deterministically**, not
-  by an LLM — `etfOverlap.ts` and `concentration.ts` generate near-
-  verbatim variants. `digest.ts` and `tradeReview.ts` are the only two
-  places that actually call Claude, and both only narrate/critique
-  numbers computed elsewhere.
+- **Financial calculations must never rely on AI — LLMs explain results,
+  deterministic code computes them** (see Engineering principles below).
+  Fully honored today: every score/warning — `washSale.ts`, `taxCheck.ts`,
+  `scores.ts`, `etfOverlap.ts`, `concentration.ts` — is deterministic;
+  `digest.ts` and `tradeReview.ts` are the only two places that call
+  Claude, and both only narrate/critique numbers computed elsewhere. Even
+  the AI-philosophy example sentences below ("You already own similar
+  exposure through QQQ") are already produced deterministically by
+  `etfOverlap.ts`/`concentration.ts`, not by an LLM.
 
 ## Verification log
 
-**All v1 features: fully verified as of 2026-08-03**, including a real
-authenticated browser click-through on both local and the Vercel
-deployment (user-confirmed) — the health score (6 sub-scores), trade-check
-panels (incl. AI second opinion + rationale textarea), tax-check panel
-(incl. IRA zero-tax case), settings tax-profile form, and the journal
-prompt on both manual and recorded-simulator buys. This closes out what
-had been the standing gap through 2026-08-02 (unit/DB-tested but never
-browser-verified, due to no stored browser session or inbox access in
-that environment).
-
-Underlying test/build state as of the last full pass: 146 tests passing,
-`tsc`/`eslint`/`next build` clean, Supabase advisors clean. Phase 1 auth
-was additionally verified end-to-end against live Supabase on
-2026-07-31 (real signup email, every API route with a real session,
-wash-sale engine against real DB-backed data). The one DB-level subtlety
-worth remembering: `journal_entries.lot_id`'s `on delete set null`
-behavior (see Database section above) was confirmed with a real insert →
-full-lot-delete → check → clean-up against the live database, not just
-assumed from the schema.
+169 tests passing, `tsc`/`eslint`/`next build` clean, Supabase advisors
+clean (aside from the pre-existing, unrelated "leaked password
+protection disabled" warning). All 5 MVP features and SnapTrade sync
+slice 1 have been exercised via a real authenticated browser session on
+both local and the Vercel deployment, including the health score,
+trade-check panels (incl. AI second opinion), tax-check panel (incl. IRA
+zero-tax case), the journal prompt, and a real SnapTrade sandbox
+connect → link → sync cycle. One DB-level subtlety worth remembering:
+`journal_entries.lot_id`'s `on delete set null` behavior was confirmed
+with a real insert → full-lot-delete → check → clean-up against the
+live database, not just assumed from the schema.
 
 Demo data exists under `tanush.yarram@gmail.com` and, separately, an
 older copy under `tanush.yarram@icloud.com`. Both: 4 accounts spanning
@@ -178,68 +175,57 @@ deferred + buy-after-loss wash-sale scenarios.
 
 ## The 4-phase roadmap to production readiness
 
-1. **Hostable at all** (auth + hosted DB + deploy) — **closed.** Auth
-   verified end-to-end incl. the Resend sandbox limitation (see Auth flow
-   above).
+**Where this stands right now:** Phase 1 is closed. Phase 2 slice 1 is
+live; slice 2 (below) is the natural next unit of work on this project.
+Phase 3 has two of four items done; the other two (Sentry, privacy/ToS)
+are unstarted and don't depend on anything else — either can be picked up
+any time. Phase 4 hasn't started and depends on nothing in Phases 2-3, so
+it's an independent track if getting real users becomes the priority over
+more brokerage-sync depth.
+
+1. **Hostable at all** (auth + hosted DB + deploy) — **closed.**
 2. **Cut onboarding friction** — SnapTrade brokerage sync, replacing
-   manual/CSV entry. **Slice 1 (connect + holdings + cash) fully
-   live-verified 2026-08-04/05, including a real browser click-through
-   (user-confirmed).** Built: `BrokerageProvider`
-   abstraction (`src/lib/brokerage/types.ts`),
-   `reconcileLots.ts`'s tax-lot/activity-replay/residual reconciliation
-   (12 unit tests), the `snaptrade.ts` adapter (`snaptrade-typescript-sdk`
-   — pure JS, no native build step, safe for this Mac), the orchestration
-   layer (`sync.ts`) and its five `/api/brokerage/*` routes, a
-   `BrokerageConnect` UI on `/holdings` (full-redirect to the Connection
-   Portal, not the iframe flow), and the `purchase_date` nullability
-   change threaded through every consumer (`washSale.ts`, `taxCheck.ts`,
-   `scores.ts`) with visible "Unknown" caveats in the UI rather than a
-   fabricated date. Gated behind `SNAPTRADE_CLIENT_ID`/
-   `SNAPTRADE_CONSUMER_KEY`, now set in both `.env.local` and Vercel
-   production — absent either, `BrokerageConnect` still renders nothing
-   and the routes still 501. 169 tests passing,
-   `tsc`/`eslint`/`next build` clean.
-
-   **The credentials are a SnapTrade commercial *test* key**
-   (`getPartnerInfo` → `name: "Ledger-Check Test"`, `is_personal: false`),
-   confirming `snaptrade.ts`'s hardcoded `SnaptradeAuth.commercialApiKey`
-   mode is correct. Test keys only reach SnapTrade's simulated `SANDBOX`
-   institution (confirmed present in the 37 allowed brokerages) —
-   **no real brokerage (Fidelity/Schwab/Robinhood/etc.) can be connected
-   until a production key is approved**, in prod or locally. The schema
-   migration is applied live (see Database section above) and
-   `registerSnapTradeUser` / `loginSnapTradeUser` were exercised directly
-   against the live API with a throwaway test user (then deleted via
-   `deleteSnapTradeUser`) — both response shapes matched the adapter's
-   code exactly, including the `{ redirectURI, sessionId }` narrowing in
-   `connectionPortalUrl`. The user then completed the actual browser
-   click-through — linked SnapTrade's simulated `SANDBOX` institution
-   across both a taxable and a traditional-IRA account, producing real
-   rows: 1 `snaptrade_users`, 1 `brokerage_connections`
-   (`brokerage_name: "sandbox"`), 2 `accounts` (`sync_source:
-   'snaptrade'`), 5 `lots`. **Confirmed `listUserAccounts` /
-   `fetchHoldings` / `reconcileLots` all work against real data** — 2 of
-   the 5 lots came back with a full tax-lot/activity match (real
-   `purchase_date`), 3 came back with only a live position and no
-   reconstructable history, correctly falling through to
-   `reconcileLots`'s `position-residual` branch (`external_key:
-   "TICKER:residual"`, `purchase_date: null`) rather than a fabricated
-   date — the first real exercise of that path.
-
-   Re-ran `washSale.ts`/`taxCheck.ts` against this exact live dataset
-   (temporary test, not committed): selling part of a null-dated lot at
-   a loss correctly returns the `uncheckableLots` wash-sale warning
-   instead of a silent pass; a null-dated sell's gain/loss is excluded
-   from `shortTermGainLoss`/`longTermGainLoss`/`estimatedTax` and
-   surfaced via `unknownTermWarning` instead; the IRA account
-   (`traditional_ira`) zeroes every dollar figure regardless of the null
-   date, as designed. Sales-history import, scheduled re-sync, and
-   disconnect handling remain an explicit follow-up, not this slice.
-3. **Trust & polish** — Sentry, rate-limit the digest endpoint, encrypt
-   brokerage tokens (once Phase 2 lands) + a real privacy policy/ToS. Not
-   started.
-4. **Get users** — landing/waitlist page pitching the cross-account
-   wash-sale angle; DIY-investor communities over paid ads. Not started.
+   manual/CSV entry.
+   - **Slice 1 (connect + holdings + cash + disconnect) — live and
+     verified**, including a real browser click-through against
+     SnapTrade's sandbox and DB-level confirmation of the synced rows.
+     Gated behind `SNAPTRADE_CLIENT_ID`/`SNAPTRADE_CONSUMER_KEY` (set in
+     both `.env.local` and Vercel production) — absent either,
+     `BrokerageConnect` renders nothing and the routes 501. See the
+     Database section above for the schema. **The credentials are a
+     SnapTrade commercial *test* key**, so only the simulated `SANDBOX`
+     institution is reachable — no real brokerage (Fidelity/Schwab/
+     Robinhood/etc.) works until a production key is approved, in prod or
+     locally; requesting that approval is the actual unlock for this
+     phase mattering to a real user. Disconnecting a connection keeps its
+     synced accounts/lots as a frozen snapshot (flips `sync_source` to
+     `manual`, clears the link) rather than deleting them.
+   - **Slice 2 — not started.** Three independent pieces, buildable in
+     any order: (a) sales-history import — SnapTrade's BUY/SELL activity
+     is already fetched but only used for cost-basis reconstruction,
+     nothing writes to `sales`, so realized gains from a synced account
+     can't show up in Tax Check yet; (b) scheduled/automatic re-sync — a
+     Vercel Cron hitting `syncAccounts()` for every linked connection,
+     today it's purely user-initiated; (c) broken-connection detection —
+     the `disabled` column exists and is read into the UI already but
+     nothing ever writes it, needs either (b)'s cron to poll
+     `listBrokerageAuthorizations` or an error-path check inside
+     `syncOneAccount` when a sync call fails in an auth-revoked way.
+3. **Trust & polish.** Rate-limiting the AI endpoints (`ai_rate_limits`,
+   5 combined Claude calls/hour/user) and encrypting the SnapTrade
+   `user_secret` at rest (`src/lib/encryption.ts`, AES-256-GCM) are
+   **done** — see Database section. **Not started, no dependencies on
+   anything else:** Sentry/error tracking (zero error-reporting exists
+   today — failures surface only as an unlogged 500, so a first
+   production bug would be invisible until a user reports it), and a real
+   privacy policy/ToS (no `/privacy` or `/terms` route exists yet; more
+   pressing now that real brokerage credentials are stored, even
+   encrypted).
+4. **Get users.** A landing/waitlist page pitching the cross-account
+   wash-sale angle; DIY-investor communities over paid ads. **Not
+   started** — there is no public marketing page today; `proxy.ts` allows
+   only `/login` and `/auth/*` while signed out, so any future public
+   page must be added to that allowlist or it will redirect to login.
 
 ---
 
@@ -297,49 +283,25 @@ descriptive names, validate inputs, typed return objects.
 
 Never: hardcode financial assumptions, mix UI with business logic, put
 financial calculations inside prompts, hide calculations from users.
-
 **Financial calculations must never rely on AI — LLMs explain results,
-deterministic code computes them.** (Fully honored today: every
-score/warning — `washSale.ts`, `taxCheck.ts`, `scores.ts`,
-`etfOverlap.ts` — is deterministic; `digest.ts` and `tradeReview.ts` are
-the only AI calls, and both only narrate/critique numbers computed
-elsewhere.)
+deterministic code computes them** (see "What's built vs. the MVP" above
+for how this is honored today).
 
 ## Forget AI agents, forget autonomous investing — build something people trust
 
-The framing behind every version below (user's words, 2026-08-02). v1 is
-five deterministic-first features people can verify by hand; only v2 adds
-proactive intelligence, and only v3 starts reasoning across all of it
-together. Skipping straight to "AI agent that manages your portfolio"
-is exactly what this product is not — see AI philosophy above.
+The framing behind every version below. v1 is five deterministic-first
+features people can verify by hand; only v2 adds proactive intelligence,
+and only v3 starts reasoning across all of it together. Skipping straight
+to "AI agent that manages your portfolio" is exactly what this product is
+not — see AI philosophy above.
 
-## MVP scope (v1) — build in this order
+## MVP scope (v1)
 
 Portfolio Import (CSV + manual entry, done — design so brokerage APIs
 like Plaid/SnapTrade slot in later without a rewrite) is the prerequisite
-everything below sits on. Status of each feature is in "What's built"
-above — **all five are now live.**
-
-1. **Trade Check** — "I want to buy 50 shares of XYZ" in → concentration
-   impact, sector exposure, ETF overlap, diversification score, risk
-   score.
-2. **Tax Check** — before selling: wash-sale warning, short-term gain
-   warning, long-term gain countdown, estimated tax. Never estimate
-   without clearly labeling assumptions.
-3. **Portfolio Health Score** — a daily score, e.g. `Overall: 83,
-   Diversification: A, Tax efficiency: B-, Concentration: C, Sector
-   balance: B+, Cash allocation: A`. Each score needs an actionable
-   recommendation eventually, not just a letter.
-4. **AI Trade Review** — instead of "open ChatGPT and paste your
-   portfolio," build the prompts in: "Explain why this trade may be a
-   mistake," "Challenge my reasoning." An intelligent devil's advocate,
-   not an oracle — same never-buy-never-sell constraint as everywhere
-   else in this app, just conversational instead of a fixed panel.
-5. **Investment Journal** — on purchase, ask why (long-term growth,
-   dividend income, value opportunity, ...). Save it. Later, remind the
-   user against their own stated thesis. This is the feature most likely
-   to create real behavioral trust, because it holds the user accountable
-   to themselves, not to the app's opinion.
+everything below sits on. Build order, status and gaps for each are in
+"What's built vs. the MVP" above — **all five are live**: Trade Check,
+Tax Check, Portfolio Health Score, AI Trade Review, Investment Journal.
 
 ## Version 2 — once people love the basics, add proactive intelligence
 

@@ -22,6 +22,12 @@ CLAUDE_API_KEY=your-key-here   # for the AI digest (Claude 4.5 Haiku)
 # these, the app works exactly as before (manual entry + CSV import only).
 SNAPTRADE_CLIENT_ID=your-client-id
 SNAPTRADE_CONSUMER_KEY=your-consumer-key
+
+# Required if SnapTrade is enabled — encrypts the SnapTrade user_secret at
+# rest. Generate with:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+# Losing this key makes every stored secret permanently undecryptable.
+BROKERAGE_TOKEN_ENCRYPTION_KEY=32-random-bytes-base64
 ```
 
 Sign-in is passwordless (magic link via email) — see "Auth setup" below for

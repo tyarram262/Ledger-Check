@@ -137,6 +137,27 @@ export default function BrokerageConnect() {
     router.refresh();
   }
 
+  /** Disconnects a brokerage connection — its accounts/lots stay in
+   *  `/holdings` as a frozen snapshot (see `sync.ts`'s
+   *  `disconnectConnection` doc comment), only the connection itself and
+   *  its "keep syncing" status go away. */
+  async function handleDisconnect(connectionId: number) {
+    setPending(`disconnect-${connectionId}`);
+    setError(null);
+    const result = await callApi<{ ok: true }>(`/api/brokerage/connections/${connectionId}`, "Failed to disconnect.", {
+      method: "DELETE",
+    });
+    setPending(null);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setStatus((prev) =>
+      prev ? { ...prev, connections: prev.connections.filter((c) => c.id !== connectionId) } : prev
+    );
+    router.refresh();
+  }
+
   if (!status || !status.configured) return null;
 
   return (
@@ -171,6 +192,38 @@ export default function BrokerageConnect() {
             </button>
           )}
         </div>
+      )}
+
+      {!discovered && status.connections.length > 0 && (
+        <ul className="mt-3 space-y-2">
+          {status.connections.map((c) => (
+            <li
+              key={c.id}
+              className="flex flex-wrap items-center gap-3 rounded border border-slate-200 p-3 text-sm"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="font-medium">{c.brokerageName ?? "Brokerage connection"}</p>
+                <p className="text-xs text-slate-500">
+                  {c.lastSyncedAt
+                    ? `Last synced ${new Date(c.lastSyncedAt).toLocaleString()}`
+                    : "Not synced yet"}
+                  {c.disabled && (
+                    <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-700">
+                      Needs attention at the brokerage
+                    </span>
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => handleDisconnect(c.id)}
+                disabled={pending === `disconnect-${c.id}`}
+                className="rounded border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+              >
+                {pending === `disconnect-${c.id}` ? "Disconnecting…" : "Disconnect"}
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
 
       {discovered && (

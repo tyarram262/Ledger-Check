@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Account, AccountType, Lot, LotSource, Sale } from "@/lib/types";
 import type { FilingStatus } from "@/lib/taxRates";
 import { horizonReviewDate, type JournalEntry, type TimeHorizon } from "@/lib/journal";
+import { decryptSecret, encryptSecret } from "@/lib/encryption";
 
 interface AccountRow {
   id: number;
@@ -577,8 +578,9 @@ export interface SnapTradeCredentials {
 }
 
 /** `user_secret` grants read access to the user's live brokerage data —
- *  never select this into a client component or log it (see CLAUDE.md's
- *  "encrypt brokerage tokens" Phase 3 item, which applies to this column). */
+ *  never select this into a client component or log it. Stored encrypted
+ *  at rest (`src/lib/encryption.ts`, AES-256-GCM) — the column holds
+ *  ciphertext, decrypted here on the way out. */
 export async function getSnapTradeCredentials(): Promise<SnapTradeCredentials | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -587,13 +589,13 @@ export async function getSnapTradeCredentials(): Promise<SnapTradeCredentials | 
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) return null;
-  return { snaptradeUserId: data.snaptrade_user_id, userSecret: data.user_secret };
+  return { snaptradeUserId: data.snaptrade_user_id, userSecret: decryptSecret(data.user_secret) };
 }
 
 export async function saveSnapTradeCredentials(creds: SnapTradeCredentials): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("snaptrade_users").upsert(
-    { snaptrade_user_id: creds.snaptradeUserId, user_secret: creds.userSecret },
+    { snaptrade_user_id: creds.snaptradeUserId, user_secret: encryptSecret(creds.userSecret) },
     { onConflict: "user_id" }
   );
   if (error) throw new Error(error.message);
@@ -648,5 +650,26 @@ export async function touchConnectionSynced(connectionId: number): Promise<void>
     .from("brokerage_connections")
     .update({ last_synced_at: new Date().toISOString() })
     .eq("id", connectionId);
+  if (error) throw new Error(error.message);
+}
+
+/** Clears the SnapTrade link on every account tied to a connection being
+ *  disconnected, but leaves the accounts and their lots in place — a
+ *  frozen snapshot of the last sync, not deleted data (see
+ *  `disconnectConnection` in `sync.ts`). `sync_source` flips back to
+ *  `'manual'` so re-linking the same brokerage account later creates a
+ *  fresh row instead of silently reattaching to this stale one. */
+export async function detachAccountsFromConnection(connectionId: number): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("accounts")
+    .update({ snaptrade_account_id: null, connection_id: null, sync_source: "manual" })
+    .eq("connection_id", connectionId);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteBrokerageConnection(connectionId: number): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("brokerage_connections").delete().eq("id", connectionId);
   if (error) throw new Error(error.message);
 }

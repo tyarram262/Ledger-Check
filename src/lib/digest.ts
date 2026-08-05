@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { checkAiRateLimit } from "@/lib/aiRateLimit";
 import { getConcentrationThreshold, listLots } from "@/lib/queries";
 import { concentrationVerdict, sectorAllocation } from "@/lib/concentration";
 import { lookupSecurity } from "@/lib/sectors";
@@ -100,6 +101,11 @@ export async function generateDigest(): Promise<
       status: 400,
       error: "Add some holdings first — there's nothing to summarize yet.",
     };
+  }
+
+  const rateLimit = await checkAiRateLimit();
+  if (!rateLimit.ok) {
+    return { ok: false, status: 429, error: rateLimit.error };
   }
 
   const prompt = await buildPrompt(lots);

@@ -165,6 +165,23 @@ export const snapTradeProvider: BrokerageProvider = {
       warnings,
     };
   },
+
+  async disconnectAuthorization(creds, authorizationId) {
+    try {
+      await getClient().connections.removeBrokerageAuthorization({
+        authorizationId,
+        userId: creds.externalUserId,
+        userSecret: creds.userSecret,
+      });
+    } catch (err) {
+      // Best-effort — see the doc comment on `BrokerageProvider.disconnectAuthorization`.
+      // A 404-shaped error means SnapTrade already has no record of this
+      // authorization (e.g. the user removed it brokerage-side), which is
+      // the same end state we're trying to reach, not a failure.
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status !== 404) throw err;
+    }
+  },
 };
 
 export { isConfigured as isSnapTradeConfigured };

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { checkAiRateLimit } from "@/lib/aiRateLimit";
 import type { SimulatedTrade } from "@/lib/washSale";
 import type { SimulationResult } from "@/lib/simulate";
 
@@ -114,6 +115,11 @@ export async function generateTradeReview(
       status: 503,
       error: "CLAUDE_API_KEY isn't set. Add it to .env.local and restart the dev server.",
     };
+  }
+
+  const rateLimit = await checkAiRateLimit();
+  if (!rateLimit.ok) {
+    return { ok: false, status: 429, error: rateLimit.error };
   }
 
   const prompt = buildPrompt(trade, result, rationale);

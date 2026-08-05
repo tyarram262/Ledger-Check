@@ -11,6 +11,8 @@ import {
   updateAccountCash,
   touchConnectionSynced,
   listBrokerageConnections,
+  detachAccountsFromConnection,
+  deleteBrokerageConnection,
   type SnapTradeCredentials,
   type BrokerageConnectionRow,
 } from "@/lib/queries";
@@ -155,6 +157,44 @@ export async function syncAccounts(onlyAccountId?: number): Promise<SyncSummary[
           warnings: [result.reason instanceof Error ? result.reason.message : "Sync failed for this account."],
         }
   );
+}
+
+/**
+ * Disconnects one brokerage connection: best-effort removes the
+ * authorization at SnapTrade, then detaches every account it synced
+ * (see `detachAccountsFromConnection`'s doc comment — accounts/lots are
+ * kept as a frozen snapshot, not deleted) before deleting the local
+ * `brokerage_connections` row. Order matters: accounts must be detached
+ * (their `connection_id` cleared) before the connection row is deleted,
+ * even though the FK is `on delete set null` and would eventually get
+ * there anyway — doing it explicitly first also lets us set `sync_source`
+ * back to `'manual'` in the same step, which the FK cascade alone
+ * wouldn't do.
+ */
+export async function disconnectConnection(connectionId: number): Promise<void> {
+  const connections = await listBrokerageConnections();
+  const connection = connections.find((c) => c.id === connectionId);
+  if (!connection) {
+    throw new Error("That brokerage connection wasn't found.");
+  }
+
+  const creds = await getSnapTradeCredentials();
+  if (creds) {
+    try {
+      await snapTradeProvider.disconnectAuthorization(
+        { externalUserId: creds.snaptradeUserId, userSecret: creds.userSecret },
+        connection.authorizationId
+      );
+    } catch {
+      // Best-effort — see `BrokerageProvider.disconnectAuthorization`'s doc
+      // comment. Local cleanup below must proceed either way: a user
+      // clicking "Disconnect" expects it gone from their view regardless
+      // of whether SnapTrade's side succeeds.
+    }
+  }
+
+  await detachAccountsFromConnection(connectionId);
+  await deleteBrokerageConnection(connectionId);
 }
 
 export interface ConnectionStatus {

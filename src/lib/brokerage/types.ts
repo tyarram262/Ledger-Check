@@ -68,6 +68,14 @@ export interface BrokerageProvider {
   connectionPortalUrl(creds: BrokerageCredentials, redirectUri: string): Promise<string>;
   listAccounts(creds: BrokerageCredentials): Promise<BrokerageAccount[]>;
   fetchHoldings(creds: BrokerageCredentials, externalAccountId: string): Promise<FetchHoldingsResult>;
+  /** Fully removes a brokerage authorization at the provider — the user is
+   *  disconnecting, not just pausing sync (that would be a "disable", a
+   *  different, less final operation this app doesn't expose). Should be
+   *  treated as best-effort by the caller: the provider may have already
+   *  revoked the authorization on its end (e.g. the user removed it from
+   *  the brokerage's own app), which isn't a reason to block local
+   *  cleanup. */
+  disconnectAuthorization(creds: BrokerageCredentials, authorizationId: string): Promise<void>;
 }
 
 /**

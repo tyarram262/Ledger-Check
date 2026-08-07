@@ -1,5 +1,5 @@
 @AGENTS.md
-# Session handoff — READ THIS FIRST (updated 2026-08-05, Phase 2 slice 2a/2c)
+# Session handoff — READ THIS FIRST (updated 2026-08-07, Phase 2 slice 2a/2c + Sentry)
 
 Two layers below this one: **"Mission & how to work here"** (the north
 star — how to think about features and write code in this repo) and
@@ -185,7 +185,7 @@ A few facts worth knowing that aren't obvious from the code:
 
 ## Verification log
 
-182 tests passing, `tsc`/`eslint`/`next build` clean, Supabase advisors
+191 tests passing, `tsc`/`eslint`/`next build` clean, Supabase advisors
 clean (aside from the pre-existing, unrelated "leaked password
 protection disabled" warning). All 5 MVP features and SnapTrade sync
 slice 1 have been exercised via a real authenticated browser session on
@@ -344,15 +344,48 @@ the priority over more brokerage-sync depth.
        stale-on-page-load re-sync under the user's own session instead of
        a cron — before picking this back up.
 3. **Trust & polish.** Rate-limiting the AI endpoints (`ai_rate_limits`,
-   5 combined Claude calls/hour/user) and encrypting the SnapTrade
-   `user_secret` at rest (`src/lib/encryption.ts`, AES-256-GCM) are
-   **done** — see Database section. **Not started, no dependencies on
-   anything else:** Sentry/error tracking (zero error-reporting exists
-   today — failures surface only as an unlogged 500, so a first
-   production bug would be invisible until a user reports it), and a real
-   privacy policy/ToS (no `/privacy` or `/terms` route exists yet; more
-   pressing now that real brokerage credentials are stored, even
-   encrypted).
+   5 combined Claude calls/hour/user), encrypting the SnapTrade
+   `user_secret` at rest (`src/lib/encryption.ts`, AES-256-GCM), and Sentry
+   error tracking are **done** — see Database section for the first two and
+   just below for Sentry. **Not started:** a real privacy policy/ToS (no
+   `/privacy` or `/terms` route exists yet; more pressing now that real
+   brokerage credentials are stored, even encrypted).
+   - **Sentry (`@sentry/nextjs`) — done, gated on a DSN that hasn't been
+     added yet.** `src/instrumentation.ts` (Next 16's `register()` +
+     `onRequestError` convention — verified against
+     `node_modules/next/dist/docs/.../instrumentation.md`, per AGENTS.md)
+     dynamically imports `sentry.server.config.ts`/`sentry.edge.config.ts`
+     by `NEXT_RUNTIME`; `src/instrumentation-client.ts` covers the browser;
+     `src/app/global-error.tsx` — previously missing entirely — now reports
+     root-layout render errors that escape every nested `error.tsx`. All
+     four are gated on `NEXT_PUBLIC_SENTRY_DSN` (unset today, same pattern
+     as `SNAPTRADE_CLIENT_ID`/`SNAPTRADE_CONSUMER_KEY` gating
+     `BrokerageConnect`) — absent, `Sentry.init` is never called and
+     `Sentry.captureRequestError`/`captureRouterTransitionStart` are safe
+     no-ops (confirmed by invoking `onRequestError` directly with no DSN
+     set — completed with no throw). `next.config.ts`'s `withSentryConfig`
+     wrapper disables source-map upload unless `SENTRY_AUTH_TOKEN` is set,
+     so a build with no Sentry config at all stays exactly as clean as
+     before (verified: `next build` with no env vars set produces the same
+     clean output). **This app stores encrypted brokerage credentials and
+     financial data, so PII scrubbing isn't optional:** `src/lib/sentryScrub.ts`
+     (9 tests, `sentryScrub.test.ts`) is a shared `beforeSend` used by all
+     three configs — deep-redacts any key matching secret/token/password/
+     `api_key`/encryption/authorization/cookie/`consumer_key`/`client_id`
+     (covers `user_secret`, `CLAUDE_API_KEY`, `BROKERAGE_TOKEN_ENCRYPTION_KEY`,
+     `SNAPTRADE_CONSUMER_KEY`/`SNAPTRADE_CLIENT_ID` regardless of nesting),
+     strips `Cookie`/`Authorization` headers, and strips the query string
+     off any `/auth/confirm` URL specifically because that query carries a
+     live magic-link `token_hash` (see Auth flow above) — a captured error
+     URL would otherwise leak a working sign-in link to a third party. Errs
+     toward over-redaction (e.g. `external_key`, not actually sensitive,
+     still gets swept by the `client_id`/`consumer_key` pattern) rather
+     than risk under-redacting. **User action still needed:** create a
+     Sentry project, add `NEXT_PUBLIC_SENTRY_DSN` (and optionally
+     `SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_AUTH_TOKEN`) to `.env.local`
+     (placeholders already added) and Vercel — no code changes required
+     once that's done. Not yet verified: a real event landing in a live
+     Sentry dashboard, since no DSN exists yet to test against.
 4. **Get users.** A landing/waitlist page pitching the cross-account
    wash-sale angle; DIY-investor communities over paid ads. **Not
    started** — there is no public marketing page today; `proxy.ts` allows

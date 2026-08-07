@@ -79,12 +79,23 @@ export default async function RootLayout({
           {children}
         </main>
         <footer className="border-t border-slate-200 bg-white px-4 py-3 text-center text-xs text-slate-400">
-          Ledger Check is an informational gut-check, not tax or investment
-          advice.{" "}
-          <Link href="/settings" className="underline hover:text-slate-600">
-            Read the full disclaimer
-          </Link>
-          .
+          <p>
+            Ledger Check is an informational gut-check, not tax or investment
+            advice.{" "}
+            <Link href="/settings" className="underline hover:text-slate-600">
+              Read the full disclaimer
+            </Link>
+            .
+          </p>
+          <p className="mt-1">
+            <Link href="/privacy" className="underline hover:text-slate-600">
+              Privacy Policy
+            </Link>
+            {" · "}
+            <Link href="/terms" className="underline hover:text-slate-600">
+              Terms of Service
+            </Link>
+          </p>
         </footer>
       </body>
     </html>

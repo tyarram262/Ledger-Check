@@ -1,5 +1,5 @@
 @AGENTS.md
-# Session handoff — READ THIS FIRST (updated 2026-08-07, Phase 2 slice 2a/2c + Sentry)
+# Session handoff — READ THIS FIRST (updated 2026-08-07, Phase 2 slice 2a/2c + Phase 3 closed out)
 
 Two layers below this one: **"Mission & how to work here"** (the north
 star — how to think about features and write code in this repo) and
@@ -287,11 +287,11 @@ Phase 2 slice 2/Phase 3 as currently understood.
 **Where this stands right now:** Phase 1 is closed. Phase 2 slice 1 is
 live; slice 2 is now two-thirds done (2a, 2c — see below), with 2b the
 one remaining piece and it's blocked on a design decision, not just
-unstarted. Phase 3 has two of four items done; the other two (Sentry,
-privacy/ToS) are unstarted and don't depend on anything else — either can
-be picked up any time. Phase 4 hasn't started and depends on nothing in
-Phases 2-3, so it's an independent track if getting real users becomes
-the priority over more brokerage-sync depth.
+unstarted. **Phase 3 is fully closed** — rate-limiting, encryption, Sentry,
+and privacy/ToS are all done (2026-08-07). Phase 4 hasn't started and
+depends on nothing in Phases 2-3, so it's the natural next thing to pick
+up unless more brokerage-sync depth (Phase 2 slice 2b) takes priority
+first.
 
 1. **Hostable at all** (auth + hosted DB + deploy) — **closed.**
 2. **Cut onboarding friction** — SnapTrade brokerage sync, replacing
@@ -343,13 +343,30 @@ the priority over more brokerage-sync depth.
        introduce a service-role client for this one case, or do
        stale-on-page-load re-sync under the user's own session instead of
        a cron — before picking this back up.
-3. **Trust & polish.** Rate-limiting the AI endpoints (`ai_rate_limits`,
-   5 combined Claude calls/hour/user), encrypting the SnapTrade
-   `user_secret` at rest (`src/lib/encryption.ts`, AES-256-GCM), and Sentry
-   error tracking are **done** — see Database section for the first two and
-   just below for Sentry. **Not started:** a real privacy policy/ToS (no
-   `/privacy` or `/terms` route exists yet; more pressing now that real
-   brokerage credentials are stored, even encrypted).
+3. **Trust & polish — all four items done.** Rate-limiting the AI endpoints
+   (`ai_rate_limits`, 5 combined Claude calls/hour/user) and encrypting the
+   SnapTrade `user_secret` at rest (`src/lib/encryption.ts`, AES-256-GCM) —
+   see Database section. Sentry error tracking and a privacy policy/ToS —
+   see the two sub-bullets just below.
+   - **Privacy Policy + Terms of Service — done.** `/privacy`
+     (`src/app/privacy/page.tsx`) and `/terms` (`src/app/terms/page.tsx`),
+     both added to `PUBLIC_PATHS` in `src/lib/supabase/proxy.ts` so they're
+     reachable signed-out (confirmed against the running dev server: `200`
+     with real content, vs. `/holdings`'s `307` to `/login`), linked from
+     `layout.tsx`'s shared footer on every page. Content is an honest,
+     plain-language description of *actual current behavior* — what's
+     collected, that Supabase/Vercel/SnapTrade/Resend/Anthropic are the
+     only parties data reaches, no ads/selling/third-party tracking, the
+     one session cookie, and that there's no self-serve deletion yet
+     (email-request only) — not boilerplate, and **both pages explicitly
+     say they haven't been reviewed by an attorney and need real legal
+     review before Phase 4's public push**, same honesty standard as the
+     Disclaimer &amp; settings page's "known limitations" list. Contact
+     email is `tanush.yarram@gmail.com` (explicit user decision,
+     2026-08-07) and the pages refer to the operator generically as
+     "Ledger Check"/"we" rather than claiming a business entity that
+     doesn't exist (also an explicit decision that day) — revisit both if
+     that changes.
    - **Sentry (`@sentry/nextjs`) — done, gated on a DSN that hasn't been
      added yet.** `src/instrumentation.ts` (Next 16's `register()` +
      `onRequestError` convention — verified against

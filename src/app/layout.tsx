@@ -14,10 +14,26 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_DESCRIPTION =
+  "A plain-English gut check on sector concentration and wash sales before you trade — including the cross-account IRA wash sale your broker can't see.";
+
 export const metadata: Metadata = {
   title: "Ledger Check",
-  description:
-    "A plain-English gut check on sector concentration and wash sales before you trade.",
+  description: SITE_DESCRIPTION,
+  // No branded image asset exists yet (see CLAUDE.md's Phase 4 GTM gaps),
+  // so these render as a text-only card on Reddit/Discord/Slack rather than
+  // a bare URL — still a real improvement, not a placeholder image.
+  openGraph: {
+    title: "Ledger Check",
+    description: SITE_DESCRIPTION,
+    siteName: "Ledger Check",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Ledger Check",
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export default async function RootLayout({
@@ -40,7 +56,7 @@ export default async function RootLayout({
             <Link href="/" className="text-lg font-semibold tracking-tight">
               Ledger Check
             </Link>
-            {email && (
+            {email ? (
               <div className="flex gap-4 text-sm text-slate-600">
                 <Link href="/" className="hover:text-slate-900">
                   Dashboard
@@ -53,6 +69,15 @@ export default async function RootLayout({
                 </Link>
                 <Link href="/settings" className="hover:text-slate-900">
                   Disclaimer &amp; settings
+                </Link>
+              </div>
+            ) : (
+              <div className="flex gap-4 text-sm text-slate-600">
+                <Link href="/" className="hover:text-slate-900">
+                  How it works
+                </Link>
+                <Link href="/demo" className="hover:text-slate-900">
+                  Try the demo
                 </Link>
               </div>
             )}
@@ -70,7 +95,15 @@ export default async function RootLayout({
                   </form>
                 </>
               ) : (
-                <span>Informational only — not tax advice</span>
+                <>
+                  <span className="hidden sm:inline">Informational only — not tax advice</span>
+                  <Link
+                    href="/login"
+                    className="rounded border border-slate-300 px-2 py-1 text-slate-600 hover:bg-slate-100"
+                  >
+                    Sign in
+                  </Link>
+                </>
               )}
             </div>
           </nav>

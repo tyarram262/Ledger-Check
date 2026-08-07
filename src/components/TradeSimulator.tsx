@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { Account } from "@/lib/types";
 import type { SimulationResult, Severity } from "@/lib/simulate";
 import { formatUsd } from "@/lib/format";
@@ -11,6 +12,7 @@ import TaxCheckPanel from "@/components/TaxCheckPanel";
 import ScoreDeltaPanel from "@/components/ScoreDeltaPanel";
 import TradeReviewPanel from "@/components/TradeReviewPanel";
 import JournalPrompt, { type JournalPromptTarget } from "@/components/JournalPrompt";
+import { DEMO_SUGGESTED_TRADE } from "@/lib/demoPortfolio";
 
 const SEVERITY_STYLES: Record<Severity, string> = {
   ok: "border-emerald-200 bg-emerald-50 text-emerald-800",
@@ -41,13 +43,25 @@ function mergeSlices(result: SimulationResult): MergedSlice[] {
   return [...sectors.values()].sort((a, b) => b.afterPct - a.afterPct);
 }
 
-export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
+interface TradeSimulatorProps {
+  accounts: Account[];
+  /** Renders against the public, unauthenticated `/api/demo/simulate` route
+   *  and hides every feature that requires a signed-in session (AI second
+   *  opinion, trade recording, journal prompt) — see `src/app/demo/page.tsx`. */
+  demo?: boolean;
+}
+
+export default function TradeSimulator({ accounts, demo = false }: TradeSimulatorProps) {
   const router = useRouter();
-  const [side, setSide] = useState<"buy" | "sell">("buy");
-  const [ticker, setTicker] = useState("");
-  const [shares, setShares] = useState("");
-  const [pricePerShare, setPricePerShare] = useState("");
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? 0);
+  const [side, setSide] = useState<"buy" | "sell">(demo ? DEMO_SUGGESTED_TRADE.side : "buy");
+  const [ticker, setTicker] = useState(demo ? DEMO_SUGGESTED_TRADE.ticker : "");
+  const [shares, setShares] = useState(demo ? String(DEMO_SUGGESTED_TRADE.shares) : "");
+  const [pricePerShare, setPricePerShare] = useState(
+    demo ? String(DEMO_SUGGESTED_TRADE.pricePerShare) : ""
+  );
+  const [accountId, setAccountId] = useState(
+    demo ? DEMO_SUGGESTED_TRADE.accountId : (accounts[0]?.id ?? 0)
+  );
   const [rationale, setRationale] = useState("");
   const [reviewText, setReviewText] = useState<string | null>(null);
   const [result, setResult] = useState<SimulationResult | null>(null);
@@ -70,7 +84,7 @@ export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
     setError(null);
     setRecorded(false);
     setReviewText(null);
-    const res = await fetch("/api/simulate", {
+    const res = await fetch(demo ? "/api/demo/simulate" : "/api/simulate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(tradePayload),
@@ -186,18 +200,20 @@ export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
         <div className="mt-2">
           <TickerHint ticker={ticker} />
         </div>
-        <label className="mt-3 flex flex-col gap-1 text-sm">
-          <span className="text-slate-600">
-            Why are you making this trade? (optional — used only for the AI second opinion below)
-          </span>
-          <textarea
-            value={rationale}
-            onChange={(e) => setRationale(e.target.value)}
-            rows={2}
-            placeholder="e.g. Long-term growth conviction, diversifying out of tech, rebalancing…"
-            className="rounded border border-slate-300 px-2 py-1.5"
-          />
-        </label>
+        {!demo && (
+          <label className="mt-3 flex flex-col gap-1 text-sm">
+            <span className="text-slate-600">
+              Why are you making this trade? (optional — used only for the AI second opinion below)
+            </span>
+            <textarea
+              value={rationale}
+              onChange={(e) => setRationale(e.target.value)}
+              rows={2}
+              placeholder="e.g. Long-term growth conviction, diversifying out of tech, rebalancing…"
+              className="rounded border border-slate-300 px-2 py-1.5"
+            />
+          </label>
+        )}
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
         {recorded && (
           <p className="mt-2 text-sm text-emerald-600">
@@ -330,11 +346,13 @@ export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
 
           {result.taxCheck && <TaxCheckPanel taxCheck={result.taxCheck} />}
 
-          <TradeReviewPanel
-            tradePayload={tradePayload}
-            rationale={rationale}
-            onReview={setReviewText}
-          />
+          {!demo && (
+            <TradeReviewPanel
+              tradePayload={tradePayload}
+              rationale={rationale}
+              onReview={setReviewText}
+            />
+          )}
 
           <section className="rounded-lg border border-slate-200 bg-white p-5">
             <h3 className="text-base font-semibold">
@@ -383,17 +401,26 @@ export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
             If you make this trade: {result.after.verdict.sentence}
           </p>
 
-          <button
-            onClick={handleRecord}
-            disabled={pending}
-            className="rounded border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-50"
-          >
-            {pending ? "Recording…" : "I made this trade — record it"}
-          </button>
+          {demo ? (
+            <Link
+              href="/login"
+              className="inline-block rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            >
+              Run this on your real portfolio →
+            </Link>
+          ) : (
+            <button
+              onClick={handleRecord}
+              disabled={pending}
+              className="rounded border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-50"
+            >
+              {pending ? "Recording…" : "I made this trade — record it"}
+            </button>
+          )}
         </div>
       )}
 
-      {journalTarget && (
+      {!demo && journalTarget && (
         <JournalPrompt
           target={journalTarget}
           defaultReason={rationale}

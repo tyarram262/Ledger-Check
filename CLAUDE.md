@@ -1,5 +1,5 @@
 @AGENTS.md
-# Session handoff — READ THIS FIRST (updated 2026-08-07, Phase 2 slice 2a/2c + Phase 3 closed out)
+# Session handoff — READ THIS FIRST (updated 2026-08-07, Phase 4 slice 1: public landing page + no-signup demo)
 
 Two layers below this one: **"Mission & how to work here"** (the north
 star — how to think about features and write code in this repo) and
@@ -288,10 +288,11 @@ Phase 2 slice 2/Phase 3 as currently understood.
 live; slice 2 is now two-thirds done (2a, 2c — see below), with 2b the
 one remaining piece and it's blocked on a design decision, not just
 unstarted. **Phase 3 is fully closed** — rate-limiting, encryption, Sentry,
-and privacy/ToS are all done (2026-08-07). Phase 4 hasn't started and
-depends on nothing in Phases 2-3, so it's the natural next thing to pick
-up unless more brokerage-sync depth (Phase 2 slice 2b) takes priority
-first.
+and privacy/ToS are all done (2026-08-07). **Phase 4 slice 1 (public
+landing page + no-signup live demo) is done as of 2026-08-07** — see below
+for the funnel it's built around and what's still open. The highest-value
+next step is fixing the first-run trap on `/holdings` (a new signup
+currently dead-ends there), not more of Phase 2 or 3.
 
 1. **Hostable at all** (auth + hosted DB + deploy) — **closed.**
 2. **Cut onboarding friction** — SnapTrade brokerage sync, replacing
@@ -403,11 +404,120 @@ first.
      (placeholders already added) and Vercel — no code changes required
      once that's done. Not yet verified: a real event landing in a live
      Sentry dashboard, since no DSN exists yet to test against.
-4. **Get users.** A landing/waitlist page pitching the cross-account
-   wash-sale angle; DIY-investor communities over paid ads. **Not
-   started** — there is no public marketing page today; `proxy.ts` allows
-   only `/login` and `/auth/*` while signed out, so any future public
-   page must be added to that allowlist or it will redirect to login.
+4. **Get users — slice 1 (public front door + no-signup demo) done
+   2026-08-07.** The funnel this phase is built around:
+
+   **public page → live demo → signup → first insight → retained → paid.**
+
+   Before this slice, the funnel was severed at step 1: `PUBLIC_PATHS` in
+   `src/lib/supabase/proxy.ts` didn't include `/`, so the deployed root URL
+   redirected every stranger straight to `/login` — a bare email box with
+   no explanation of what the product does, no screenshots, no pitch. The
+   only marketing copy anywhere was the `<head>` description string nobody
+   reads. There was no way to see the product's value without an email
+   round-trip, and no way to see it *after* signing up either, since a
+   brand-new account starts with zero holdings (see the first-run trap
+   below). A large paying audience was never reachable behind that wall,
+   independent of any pricing/billing question.
+
+   **What's live now:**
+   - `src/components/Landing.tsx`, rendered by `src/app/page.tsx` for
+     signed-out visitors (an `auth.getClaims()` branch — signed-in behavior
+     is unchanged). Pitches the specific, checkable claim from this doc's
+     domain reference: a wash sale repurchased in an IRA is *permanently*
+     disallowed (Rev. Rul. 2008-5), not deferred, and a broker's
+     single-account view structurally can't catch it. States pricing
+     plainly: **free while in beta**, Pro ($10–15/mo: tax analysis, AI
+     second opinion, journal, overlap alerts) named as planned, not sold —
+     no tier table for tiers nothing in the schema enforces yet.
+   - `/demo` (`src/app/demo/page.tsx`) — a no-signup, no-database live
+     product tour. `src/lib/demoPortfolio.ts` is a fixture (two accounts,
+     six lots, one loss sale) fed straight into the REAL `simulateTrade`
+     engine (`src/lib/simulate.ts`) via a new public route,
+     `src/app/api/demo/simulate/route.ts` — this is not a mockup or
+     scripted screenshots, it's the same deterministic code a paying user's
+     trade check runs, just against fixture data instead of the
+     authenticated user's own RLS-scoped rows. `TradeSimulator.tsx` grew a
+     `demo` boolean prop (one component, not a fork) that swaps the POST
+     target and hides everything requiring auth — the rationale textarea,
+     `TradeReviewPanel` (AI costs money and is rate-limited per `user_id`,
+     see `aiRateLimit.ts` — an unauthenticated twin has no one to bill or
+     throttle), the record-trade button, and the journal prompt — replacing
+     the record button with a "Run this on your real portfolio →" link to
+     `/login`. The fixture's `DEMO_SUGGESTED_TRADE` (buy NVDA in the
+     Traditional IRA) is preloaded so a visitor's first action is one
+     click, and it's engineered to trigger concentration, ETF overlap
+     (VOO/QQQ both hold NVDA), and the IRA-permanent wash-sale panel
+     simultaneously — verified live: the response shows Information
+     Technology concentration moving 56%→61%, `isIraPermanent: true`, and
+     both ETFs named as overlap contributors; switching the same trade to
+     the taxable account flips `isIraPermanent` to `false`, confirming the
+     demo runs the real branch logic, not a hardcoded response. All fixture
+     dates are computed relative to `todayIso()` (`addDays`, never a
+     literal), because `checkWashSale`'s 30-day window is relative to
+     "today" — a hardcoded date would have made the demo silently stop
+     demoing in about a month. Pinned by 6 new tests in
+     `src/lib/demoPortfolio.test.ts`.
+   - `src/app/robots.ts` / `src/app/sitemap.ts` (Next 16 file-convention
+     metadata routes) list only the public surface (`/`, `/demo`,
+     `/privacy`, `/terms`) and explicitly disallow the auth-gated routes.
+     **Found and fixed along the way:** `src/proxy.ts`'s matcher doesn't
+     exclude `/robots.txt`/`/sitemap.xml`, so without adding them to
+     `PUBLIC_PATHS` a signed-out crawler would have been redirected to
+     `/login` instead of served the file — both are now explicit entries.
+   - `layout.tsx`'s signed-out nav, previously empty, now links "How it
+     works" (`/`) and "Try the demo" (`/demo`) plus a "Sign in" button.
+     `metadata` grew `openGraph`/`twitter` fields (text-only — no branded
+     image asset exists yet, see gap below) so a pasted link renders a real
+     preview card instead of a bare URL.
+   - The `"/"` entry in `PUBLIC_PATHS` looks like it could open the whole
+     app but doesn't: `isPublicPath`'s prefix check is
+     `startsWith(\`${p}/\`)`, which for `p = "/"` is `startsWith("//")` —
+     true for no real route, so `"/"` matches root only. Commented in place
+     in `proxy.ts` so it isn't "fixed" or copied elsewhere as a pattern.
+
+   **Verified:** `npm test` (197 tests, up from 191), `tsc`/`eslint`/`next
+   build` clean, and a live signed-out `npm run dev` session — `/` and
+   `/demo` return `200`, `/holdings`/`/settings` still `307` to `/login`,
+   `/robots.txt` and `/sitemap.xml` serve correctly, `/api/demo/simulate`
+   returns the expected IRA-permanent panel for the suggested trade and the
+   expected non-IRA panel for the same trade in the taxable account. **Not
+   yet done:** a real click-through against the deployed Vercel URL (the
+   redirect logic runs differently enough in prod to be worth re-checking,
+   per this doc's existing verification standard) and any OG-card
+   preview check on a real sharing surface (Reddit/Discord/Slack unfurl).
+
+   **What's still open, in rough priority order:**
+   - **First-run trap — the highest-value next slice.** Nothing seeds a
+     default account for a new user. On `/holdings`, the "Add a holding"
+     button is `disabled={... || accounts.length === 0}` (`LotForm.tsx`,
+     same guard in `CsvImport.tsx` and `SaleForm.tsx`) with **no copy
+     anywhere explaining why the button is greyed out.** Today's funnel is
+     landing → demo → signup → dead end: a brand-new signed-in user hits
+     this wall before reaching a single real insight. This slice fixed the
+     top of the funnel; this is the very next segment and it's currently
+     broken.
+   - **SnapTrade production key still not approved** — only the sandbox
+     institution works, so no real brokerage (Fidelity/Schwab/Robinhood)
+     connects for an actual new user. External approval lead time; filing
+     for it is the gating action, not more code.
+   - **No analytics anywhere.** Nothing in `package.json` measures any step
+     of the funnel this slice just built — no way to tell whether the
+     landing page converts, whether anyone reaches `/demo`, or where
+     signups drop off. Worth resolving before investing further in
+     landing-page copy iteration, which is otherwise a guess.
+   - **Billing — deliberately still not built,** per the user's explicit
+     scoping decision this session. Revisit once demo→signup→retained shows
+     real numbers, not before; there's no one to charge yet regardless of
+     Stripe integration effort.
+   - **No branded OG/social-preview image** — `openGraph`/`twitter`
+     metadata is text-only; a shared link gets a text card, not an image
+     card, on platforms that render one.
+   - **`src/lib/taxRates.ts` is a 2026 tax-year table** with an "update
+     annually" header comment. Was already true before this slice, but a
+     public landing page actively inviting outside traffic makes a stale
+     table a live liability rather than a dormant one — worth flagging to
+     whoever owns the annual update.
 
 ---
 

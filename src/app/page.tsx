@@ -9,10 +9,12 @@ import { lookupSecurity } from "@/lib/sectors";
 import { formatUsd } from "@/lib/format";
 import { getStoredQuotes, toPriceMap } from "@/lib/quotes";
 import { buildPositions, splitPricedTickers } from "@/lib/valuation";
+import { createClient } from "@/lib/supabase/server";
 import SectorChart from "@/components/SectorChart";
 import DigestCard from "@/components/DigestCard";
 import RefreshPricesButton from "@/components/RefreshPricesButton";
 import HealthScoreCard from "@/components/HealthScoreCard";
+import Landing from "@/components/Landing";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +25,15 @@ const LEVEL_STYLES: Record<ConcentrationLevel, string> = {
 };
 
 export default async function DashboardPage() {
+  // `/` is public (see `PUBLIC_PATHS` in `src/lib/supabase/proxy.ts`) so a
+  // signed-out visitor lands here instead of being redirected to `/login`.
+  // Same getClaims() call `layout.tsx` already makes for the nav.
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  if (!data?.claims) {
+    return <Landing />;
+  }
+
   const lots = await listLots();
   const quotes = await getStoredQuotes([...new Set(lots.map((l) => l.ticker))]);
   const prices = toPriceMap(quotes);

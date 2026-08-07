@@ -1,6 +1,7 @@
-import { Snaptrade, SnaptradeAuth, type CommercialApiKeyAuth } from "snaptrade-typescript-sdk";
+import { Snaptrade, SnaptradeAuth, type AccountUniversalActivity, type CommercialApiKeyAuth } from "snaptrade-typescript-sdk";
 import { inferAccountType, type BrokerageAccount, type BrokerageProvider, type FetchHoldingsResult } from "@/lib/brokerage/types";
 import { reconcileLots, type ActivityInput, type RawTaxLot } from "@/lib/brokerage/reconcileLots";
+import { deriveSales, type DerivedSale } from "@/lib/brokerage/deriveSales";
 
 /**
  * SnapTrade adapter — the only file in the app that knows SnapTrade's
@@ -36,6 +37,53 @@ function getClient(): Snaptrade<CommercialApiKeyAuth> {
 /** Truncates a SnapTrade ISO timestamp to a plain YYYY-MM-DD date. */
 function toDateOnly(iso: string): string {
   return iso.slice(0, 10);
+}
+
+const ACTIVITIES_PAGE_LIMIT = 1000;
+const ACTIVITIES_MAX_PAGES = 10;
+
+/**
+ * Pages through `getAccountActivities` until the SDK-reported `total` is
+ * exhausted (or a safety cap is hit). The unpaginated version of this call
+ * relied on the SDK's default `limit` (1000) and ignored the response's
+ * `pagination` block entirely — harmless for lot reconstruction (a shortfall
+ * just became a `position-residual` lot), but silently truncating an active
+ * account's SELL history is exactly the failure mode sales import exists to
+ * avoid: a truncated-off loss sale is invisible to the wash-sale check with
+ * no warning at all.
+ */
+async function fetchAllActivities(
+  sdk: Snaptrade<CommercialApiKeyAuth>,
+  creds: { externalUserId: string; userSecret: string },
+  externalAccountId: string
+): Promise<{ data: AccountUniversalActivity[]; warnings: string[] }> {
+  const data: AccountUniversalActivity[] = [];
+  let offset = 0;
+
+  for (let page = 0; page < ACTIVITIES_MAX_PAGES; page++) {
+    const res = await sdk.accountInformation.getAccountActivities({
+      userId: creds.externalUserId,
+      userSecret: creds.userSecret,
+      accountId: externalAccountId,
+      type: "BUY,SELL",
+      offset,
+      limit: ACTIVITIES_PAGE_LIMIT,
+    });
+    const pageData = res.data?.data ?? [];
+    data.push(...pageData);
+    const total = res.data?.pagination?.total ?? data.length;
+    offset += pageData.length;
+    if (pageData.length === 0 || offset >= total) {
+      return { data, warnings: [] };
+    }
+  }
+
+  return {
+    data,
+    warnings: [
+      "This account's transaction history is unusually long — only the most recent activity was imported, so some older sales may be missing from tax and wash-sale checks.",
+    ],
+  };
 }
 
 export const snapTradeProvider: BrokerageProvider = {
@@ -94,7 +142,7 @@ export const snapTradeProvider: BrokerageProvider = {
     // endpoint's simpler `Position` shape is the one already checked
     // against the SDK's published docs. Revisit once there's a sandbox
     // account to test the swap against.
-    const [positionsRes, balanceRes, activitiesRes] = await Promise.all([
+    const [positionsRes, balanceRes, activities] = await Promise.all([
       sdk.accountInformation.getUserAccountPositions({
         userId: creds.externalUserId,
         userSecret: creds.userSecret,
@@ -105,18 +153,16 @@ export const snapTradeProvider: BrokerageProvider = {
         userSecret: creds.userSecret,
         accountId: externalAccountId,
       }),
-      sdk.accountInformation.getAccountActivities({
-        userId: creds.externalUserId,
-        userSecret: creds.userSecret,
-        accountId: externalAccountId,
-        type: "BUY,SELL",
-      }),
+      fetchAllActivities(sdk, creds, externalAccountId),
     ]);
 
-    // Group BUY/SELL activities by ticker up front — `reconcileLots` runs
-    // per position and needs only that position's own trade history.
+    const warnings: string[] = [...activities.warnings];
+
+    // Group BUY/SELL activities by ticker up front — both `reconcileLots`
+    // (per-position lots) and `deriveSales` (per-ticker sales) run on one
+    // ticker's own trade history at a time.
     const activitiesByTicker = new Map<string, ActivityInput[]>();
-    for (const a of activitiesRes.data?.data ?? []) {
+    for (const a of activities.data) {
       const ticker = a.symbol?.symbol;
       if (!ticker || !a.id || !a.trade_date || a.units == null || a.price == null) continue;
       const list = activitiesByTicker.get(ticker) ?? [];
@@ -131,7 +177,6 @@ export const snapTradeProvider: BrokerageProvider = {
     }
 
     const allLots: FetchHoldingsResult["lots"] = [];
-    const warnings: string[] = [];
 
     for (const position of positionsRes.data ?? []) {
       const ticker = position.symbol?.symbol?.symbol;
@@ -159,8 +204,20 @@ export const snapTradeProvider: BrokerageProvider = {
       warnings.push(...lotWarnings);
     }
 
+    // Sales are derived over *every* ticker with BUY/SELL history, not just
+    // tickers with a live position — a fully-exited position's loss sale is
+    // exactly the kind of history the wash-sale check needs, and the
+    // position loop above never visits it.
+    const allSales: DerivedSale[] = [];
+    for (const [ticker, tickerActivities] of activitiesByTicker) {
+      const { sales, warnings: saleWarnings } = deriveSales(ticker, tickerActivities);
+      allSales.push(...sales);
+      warnings.push(...saleWarnings);
+    }
+
     return {
       lots: allLots,
+      sales: allSales,
       cash: balanceRes.data?.[0]?.cash ?? null,
       warnings,
     };
@@ -185,3 +242,19 @@ export const snapTradeProvider: BrokerageProvider = {
 };
 
 export { isConfigured as isSnapTradeConfigured };
+
+/**
+ * True when a SnapTrade API error means this connection's brokerage
+ * authorization has been revoked or disabled — 401/403 from an
+ * account-scoped call, since a merely-missing resource is a 404 (see
+ * `disconnectAuthorization`'s own status check above) and everything else
+ * (429, 5xx, network) is a transient failure, not a broken connection.
+ * Used by `sync.ts`'s `syncOneAccount` to decide whether to flip
+ * `brokerage_connections.disabled` — see that function's doc comment for
+ * why this predicate, rather than "any fetchHoldings failure", is the
+ * right trigger for a user-facing "needs attention" flag.
+ */
+export function isAuthRevokedError(err: unknown): boolean {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  return status === 401 || status === 403;
+}

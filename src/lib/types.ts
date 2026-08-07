@@ -38,8 +38,18 @@ export interface Sale {
   ticker: string;
   shares: number;
   salePricePerShare: number;
-  costPerShare: number;
+  /** `null` when a brokerage sync's activity history couldn't fully explain
+   *  what was sold (see `deriveSales.ts`) — never a fabricated/blended
+   *  guess. A null basis means `realizedGainLoss` is also null. */
+  costPerShare: number | null;
+  /** ISO date (YYYY-MM-DD) of the earliest lot this sale's shares came
+   *  from, when known — populated by brokerage sync only; manually
+   *  recorded/entered sales leave this `null` today (see CLAUDE.md: tax
+   *  efficiency is computed from unrealized lots only, this is a step
+   *  toward closing that gap for synced accounts). */
+  acquiredDate: string | null;
   saleDate: string; // ISO date (YYYY-MM-DD)
-  realizedGainLoss: number;
-  source: "manual" | "recorded";
+  /** `null` exactly when `costPerShare` is `null`. */
+  realizedGainLoss: number | null;
+  source: "manual" | "recorded" | "snaptrade";
 }

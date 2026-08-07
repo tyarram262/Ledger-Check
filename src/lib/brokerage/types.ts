@@ -1,4 +1,5 @@
 import type { AccountType } from "@/lib/types";
+import type { DerivedSale } from "@/lib/brokerage/deriveSales";
 
 /**
  * Provider-neutral brokerage-sync types (Phase 2 of the roadmap in
@@ -53,6 +54,11 @@ export interface BrokerageLot {
 export interface FetchHoldingsResult {
   lots: BrokerageLot[];
   cash: number | null;
+  /** Realized sales reconstructed from BUY/SELL activity history — see
+   *  `deriveSales.ts`. Covers *every* ticker with SELL activity in the
+   *  fetched window, not just tickers still held (a fully-exited position's
+   *  loss sale is exactly the kind of history a wash-sale check needs). */
+  sales: DerivedSale[];
   /** Human-readable notes about any reconciliation shortcuts taken for
    *  this account (e.g. "12 shares of AAPL have no known purchase date") —
    *  surfaced to the user, not swallowed. */

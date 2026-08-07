@@ -284,7 +284,8 @@ export default function BrokerageConnect() {
           {syncSummaries.map((s) => (
             <p key={s.accountId} className="text-slate-600">
               Account #{s.accountId}: {s.lotsSynced} lot{s.lotsSynced === 1 ? "" : "s"} synced
-              {s.lotsRemoved > 0 ? `, ${s.lotsRemoved} removed` : ""}.
+              {s.lotsRemoved > 0 ? `, ${s.lotsRemoved} removed` : ""}
+              {s.salesImported > 0 ? `, ${s.salesImported} sale${s.salesImported === 1 ? "" : "s"} imported` : ""}.
               {s.warnings.length > 0 && (
                 <span className="block text-amber-700">{s.warnings.join(" ")}</span>
               )}

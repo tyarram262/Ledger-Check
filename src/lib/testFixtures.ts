@@ -24,14 +24,15 @@ export function makeSale(over: Partial<Sale> = {}): Sale {
     ticker: "AAPL",
     shares: 10,
     salePricePerShare: 90,
-    costPerShare: 100,
+    costPerShare: 100 as number | null,
+    acquiredDate: null as string | null,
     saleDate: "2026-06-20",
     source: "manual" as const,
   };
   const merged = { ...base, ...over };
   return {
     realizedGainLoss:
-      (merged.salePricePerShare - merged.costPerShare) * merged.shares,
+      merged.costPerShare == null ? null : (merged.salePricePerShare - merged.costPerShare) * merged.shares,
     ...merged,
   };
 }

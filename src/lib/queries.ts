@@ -260,10 +260,11 @@ interface SaleRow {
   ticker: string;
   shares: number;
   sale_price_per_share: number;
-  cost_per_share: number;
+  cost_per_share: number | null;
+  acquired_date: string | null;
   sale_date: string;
-  realized_gain_loss: number;
-  source: "manual" | "recorded";
+  realized_gain_loss: number | null;
+  source: "manual" | "recorded" | "snaptrade";
   accounts: { name: string } | null;
 }
 
@@ -276,6 +277,7 @@ function mapSale(r: SaleRow): Sale {
     shares: r.shares,
     salePricePerShare: r.sale_price_per_share,
     costPerShare: r.cost_per_share,
+    acquiredDate: r.acquired_date,
     saleDate: r.sale_date,
     realizedGainLoss: r.realized_gain_loss,
     source: r.source,
@@ -287,7 +289,7 @@ export async function listSales(): Promise<Sale[]> {
   const { data, error } = await supabase
     .from("sales")
     .select(
-      "id, account_id, ticker, shares, sale_price_per_share, cost_per_share, sale_date, realized_gain_loss, source, accounts(name)"
+      "id, account_id, ticker, shares, sale_price_per_share, cost_per_share, acquired_date, sale_date, realized_gain_loss, source, accounts(name)"
     )
     .order("sale_date", { ascending: false });
   if (error) throw new Error(error.message);
@@ -320,6 +322,51 @@ export async function createSale(input: {
     .single();
   if (error) throw new Error(error.message);
   return data.id;
+}
+
+/**
+ * Idempotent brokerage-sync upsert for one account's realized sales, keyed
+ * on `(account_id, external_key)` — the sale-side counterpart of
+ * `upsertSyncedLots` above. Deliberately **no delete sweep**, unlike lots:
+ * a lot vanishing from a sync means the position closed (a real, current
+ * fact), but a sale vanishing from the fetched activity window just means
+ * the brokerage's history horizon (or this sync's pagination cap — see
+ * `snaptrade.ts`'s `fetchAllActivities`) rolled past it. The sale itself
+ * still happened; deleting the row would silently erase wash-sale history
+ * this app exists to catch, so a previously-synced sale is kept even if a
+ * later sync no longer reports it.
+ */
+export async function upsertSyncedSales(
+  accountId: number,
+  sales: {
+    externalKey: string;
+    ticker: string;
+    shares: number;
+    salePricePerShare: number;
+    costPerShare: number | null;
+    acquiredDate: string | null;
+    saleDate: string;
+  }[]
+): Promise<{ upserted: number }> {
+  if (sales.length === 0) return { upserted: 0 };
+  const supabase = await createClient();
+  const { error } = await supabase.from("sales").upsert(
+    sales.map((s) => ({
+      account_id: accountId,
+      external_key: s.externalKey,
+      ticker: s.ticker.toUpperCase(),
+      shares: s.shares,
+      sale_price_per_share: s.salePricePerShare,
+      cost_per_share: s.costPerShare,
+      acquired_date: s.acquiredDate,
+      sale_date: s.saleDate,
+      realized_gain_loss: s.costPerShare == null ? null : (s.salePricePerShare - s.costPerShare) * s.shares,
+      source: "snaptrade" as const,
+    })),
+    { onConflict: "account_id,external_key" }
+  );
+  if (error) throw new Error(error.message);
+  return { upserted: sales.length };
 }
 
 export async function deleteSale(id: number): Promise<boolean> {
@@ -644,12 +691,27 @@ export async function upsertBrokerageConnection(input: {
   return data.id;
 }
 
+/** Records a successful sync and clears `disabled` — a connection that
+ *  synced without an auth error has, by definition, recovered from whatever
+ *  previously set `disabled` (see `setConnectionDisabled`), so this is the
+ *  natural place to un-flag it rather than requiring a separate step. */
 export async function touchConnectionSynced(connectionId: number): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase
     .from("brokerage_connections")
-    .update({ last_synced_at: new Date().toISOString() })
+    .update({ last_synced_at: new Date().toISOString(), disabled: false })
     .eq("id", connectionId);
+  if (error) throw new Error(error.message);
+}
+
+/** Flags (or clears) a connection as needing attention at the brokerage —
+ *  written by `sync.ts`'s `syncOneAccount` when a sync call fails with an
+ *  auth-revoked error (see `snaptrade.ts`'s `isAuthRevokedError`). Read by
+ *  `BrokerageConnect.tsx` to show the "Needs attention at the brokerage"
+ *  badge. */
+export async function setConnectionDisabled(connectionId: number, disabled: boolean): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("brokerage_connections").update({ disabled }).eq("id", connectionId);
   if (error) throw new Error(error.message);
 }
 

@@ -20,7 +20,7 @@ import type { BrokerageLot } from "@/lib/brokerage/types";
  * See CLAUDE.md: "never estimate without clearly labeling assumptions."
  */
 
-const SHARE_EPSILON = 1e-6;
+export const SHARE_EPSILON = 1e-6;
 
 export interface RawTaxLot {
   externalKey: string;
@@ -79,11 +79,29 @@ interface OpenLot {
   purchaseDate: string;
 }
 
+/**
+ * Filters to BUY/SELL activity and sorts it into replay order: by trade
+ * date, then BUY before SELL on the same date. `ActivityInput` carries no
+ * intraday timestamp, so same-day ordering would otherwise be arbitrary —
+ * BUY-before-SELL is the only assumption under which a same-day
+ * buy-then-sell replays correctly. Shared by `fromActivityReplay` below
+ * (lot reconstruction) and `deriveSales.ts` (sale reconstruction) so the
+ * two can never disagree about replay order for the same activity history.
+ */
+export function sortForReplay(activities: ActivityInput[]): ActivityInput[] {
+  return [...activities]
+    .filter((a) => a.type === "BUY" || a.type === "SELL")
+    .sort((a, b) => {
+      const byDate = a.tradeDate.localeCompare(b.tradeDate);
+      if (byDate !== 0) return byDate;
+      if (a.type === b.type) return 0;
+      return a.type === "BUY" ? -1 : 1;
+    });
+}
+
 function fromActivityReplay(position: PositionInput, activities: ActivityInput[]): ReconcileResult {
   const warnings: string[] = [];
-  const sorted = [...activities]
-    .filter((a) => a.type === "BUY" || a.type === "SELL")
-    .sort((a, b) => a.tradeDate.localeCompare(b.tradeDate));
+  const sorted = sortForReplay(activities);
 
   // FIFO queue of still-open lots, oldest first.
   const open: OpenLot[] = [];

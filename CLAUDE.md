@@ -1,5 +1,5 @@
 @AGENTS.md
-# Session handoff — READ THIS FIRST (updated 2026-08-05)
+# Session handoff — READ THIS FIRST (updated 2026-08-05, Phase 2 slice 2a/2c)
 
 Two layers below this one: **"Mission & how to work here"** (the north
 star — how to think about features and write code in this repo) and
@@ -74,10 +74,37 @@ not checked into the repo. Inspect it live (`mcp__supabase__list_tables` /
   RLS-scoped like every other table; `accounts` has
   `snaptrade_account_id`/`connection_id`/`sync_source`, same
   plain-`UNIQUE` treatment on `(user_id, snaptrade_account_id)`.
-  `brokerage_connections.disabled` exists but is **never written** —
-  detecting a broken/revoked connection needs scheduled re-sync or a
-  `listBrokerageAuthorizations` poll, neither of which exist yet (Phase 2
-  follow-up, not started).
+  `brokerage_connections.disabled` is now **written**, by `sync.ts`'s
+  `syncOneAccount` on an auth-revoked (401/403) `fetchHoldings` failure
+  (`snaptrade.ts`'s `isAuthRevokedError`), and cleared on the next
+  successful sync (`touchConnectionSynced`) — no cron needed for this part
+  of detection; see roadmap Phase 2 slice 2(c).
+- **Sales import (Phase 2 slice 2a).** `sales` gained `external_key`
+  (idempotent brokerage-sync upsert, same plain-`UNIQUE`-not-partial-index
+  reasoning as `lots` above) and nullable `acquired_date`; `cost_per_share`
+  and `realized_gain_loss` are now **nullable**, and `source` widened to
+  include `'snaptrade'`. A synced SELL is reconstructed by FIFO-replaying
+  BUY/SELL activity (`src/lib/brokerage/deriveSales.ts`, sibling to
+  `reconcileLots.ts`, sharing its `sortForReplay` ordering helper); when
+  the replay runs out of history before fully explaining a SELL, the sale
+  is still imported but with `cost_per_share: null` (**all-or-nothing**,
+  never a blended half-real average) and surfaced to `checkWashSale`'s buy
+  side as an `UncheckableSale` — same "can't prove it's not a loss, so
+  don't silently pass" logic as `Lot.purchaseDate: null` already used on
+  the sell side. When an `UncheckableSale` is the *only* evidence for a
+  buy-side warning, `checkWashSale` reports `isIraPermanent: false`
+  regardless of the buy's account — "permanently disallowed" is a claim
+  about a confirmed loss, and an unpriced sale hasn't confirmed one; see
+  Verification log below for the bug this caught. **No delete sweep** on
+  sync (unlike `upsertSyncedLots`):
+  a sale that drops out of the fetched activity window is still a
+  historical fact, not a closed position, so it's kept. Sales are derived
+  for *every* ticker with BUY/SELL history, not just tickers with a live
+  position — a fully-exited position's loss sale is exactly what the
+  wash-sale check needs and would otherwise never be visited.
+  `getAccountActivities` is now paginated (`snaptrade.ts`'s
+  `fetchAllActivities`) rather than relying on the SDK's default 1000-row
+  limit, which an active account's SELL history could silently exceed.
 - `ai_rate_limits` — one row per user, backing `check_ai_rate_limit(...)`
   (a `record_sell`-style `SECURITY INVOKER` function with `for update`
   row locking), a fixed-window counter shared across `/api/digest` and
@@ -129,7 +156,7 @@ slot. **All 5 MVP features are live.**
 |---|---|---|
 | **Portfolio Import** (prerequisite) | Done | CSV + manual entry (`/holdings`, `csvImport.ts`), plus the `BrokerageProvider` abstraction (`src/lib/brokerage/`) — see roadmap. |
 | **1. Trade Check** | Live | Concentration, sector, ETF overlap, diversification/risk score deltas, overall verdict all live (`/simulate`, `simulate.ts`, `etfOverlap.ts`, `scores.ts`). Missing: estimated volatility impact (no return-series data source), position sizing, behavioral warnings. |
-| **2. Tax Check** | Live | Wash-sale warning, short-term gain warning, long-term gain countdown, estimated tax all live (`washSale.ts`, `holdingPeriod.ts`, `taxCheck.ts`). Lot selection is FIFO-only. Every tax figure labeled "estimate only." |
+| **2. Tax Check** | Live | Wash-sale warning, short-term gain warning, long-term gain countdown, estimated tax all live (`washSale.ts`, `holdingPeriod.ts`, `taxCheck.ts`). Lot selection is FIFO-only. Every tax figure labeled "estimate only." The buy-side wash-sale check now also reads brokerage-synced sales (Phase 2 slice 2a) — previously a synced account's sold-at-a-loss ticker was invisible to it, a real false-negative on this feature's main draw. |
 | **3. Portfolio Health Score** | Live | **All 6 sub-scores** live and daily-persisted (`scores.ts`, `/api/health`): Diversification, Concentration, Risk, Sector Balance, Tax Efficiency, Cash Allocation → overall A–F grade. **No sub-score renders an actionable recommendation yet**, only a descriptive sentence (`SubScore.sentence`) — needs a product call on how prescriptive to get without crossing into "AI makes buy/sell decisions." |
 | **4. AI Trade Review** | Live | On-demand "second opinion" on `/simulate` (`tradeReview.ts` + `/api/trade-review` + `TradeReviewPanel.tsx`) — a devil's-advocate critique, never a buy/sell call. Stateless (no cache table); reuses the deterministic `SimulationResult` the trade-check panels already show, never computes anything itself. An optional rationale textarea makes the critique a real second opinion instead of re-narrating what's already on screen. |
 | **5. Investment Journal** | Live (v1 scope: capture + display only) | Prompted after a real buy, both the manual-entry (`LotForm.tsx`) and record-trade (`TradeSimulator.tsx`) flows; shown inline per lot in `HoldingsTable.tsx`. **Real gap, deliberately not built:** the payoff example ("you said you wouldn't sell unless revenue growth slowed below 15%; it's still 24%") needs *fundamentals* data this app has no source for — `quotes.ts` only stores a current price. V1 instead does an honest, static "this time horizon has closed" line, with no dashboard-level nudges, dismissal state, or entry editing yet. |
@@ -140,9 +167,12 @@ A few facts worth knowing that aren't obvious from the code:
   a static top-holdings snapshot for 24 ETFs) flags near-duplicate funds
   and "true" exposure through funds you already hold. IRA sells return
   **zeroed tax figures with an explanation, never a fabricated number**.
-- Tax efficiency is computed from **unrealized** lot data only — `sales`
-  has no acquisition date, so realized short/long-term can't be
-  reconstructed without a schema + `record_sell` change.
+- Tax efficiency is computed from **unrealized** lot data only. `sales`
+  now has a nullable `acquired_date`, but only the SnapTrade sales-import
+  path populates it (`deriveSales.ts`) — `record_sell` (manual/recorded
+  sales) was deliberately left alone rather than touching the atomic FIFO
+  function every manual sell depends on, so realized short/long-term still
+  can't be reconstructed for manually-entered sales.
 - **Financial calculations must never rely on AI — LLMs explain results,
   deterministic code computes them** (see Engineering principles below).
   Fully honored today: every score/warning — `washSale.ts`, `taxCheck.ts`,
@@ -155,7 +185,7 @@ A few facts worth knowing that aren't obvious from the code:
 
 ## Verification log
 
-169 tests passing, `tsc`/`eslint`/`next build` clean, Supabase advisors
+182 tests passing, `tsc`/`eslint`/`next build` clean, Supabase advisors
 clean (aside from the pre-existing, unrelated "leaked password
 protection disabled" warning). All 5 MVP features and SnapTrade sync
 slice 1 have been exercised via a real authenticated browser session on
@@ -167,21 +197,101 @@ connect → link → sync cycle. One DB-level subtlety worth remembering:
 with a real insert → full-lot-delete → check → clean-up against the
 live database, not just assumed from the schema.
 
-Demo data exists under `tanush.yarram@gmail.com` and, separately, an
-older copy under `tanush.yarram@icloud.com`. Both: 4 accounts spanning
-taxable/Roth/traditional-IRA, holdings weighted so Information Technology
-trips the concentration threshold, sales realizing IRA-permanent +
-deferred + buy-after-loss wash-sale scenarios.
+**Phase 2 slice 2a/2c (sales import + connection health) — live-verified.**
+13 new tests (`deriveSales.test.ts`'s FIFO-replay suite, `washSale.test.ts`'s
+uncheckable-sale branches, a `simulate.test.ts` regression test — see
+below), `tsc`/`eslint`/`next build` clean, Supabase advisors clean. The
+new migration (`sales_brokerage_import`) and `upsertSyncedSales`'s upsert
+semantics were verified directly against the live database: a raw
+`INSERT ... ON CONFLICT (account_id, external_key)` run twice with a
+changed price produced one row, not two, and a null-basis sale's
+`realized_gain_loss` stayed `null` rather than coercing to `0`; the test
+row was deleted afterward. **Fixed along the way, not searched for
+separately:** `simulate.ts`'s verdict-sentence builder did
+`washSale.triggers.at(-1)!` — but `checkWashSale` already had a
+`triggers: []` return case (an uncheckable, null-dated lot on a sell) that
+this assertion didn't account for, so selling a synced ticker at a loss
+while an undated residual lot remained held threw an unlogged 500 on
+`/api/simulate`. The new buy-side uncheckable-sale branch added a second
+path into the same empty-triggers state, so the assertion had to go
+regardless — `simulate.test.ts` now pins this with a fixture that
+previously would have thrown. **A second bug in that same branch was
+caught in review, not testing:** the uncheckable-only buy-side case
+returned `isIraPermanent` computed from the buy account, so buying into an
+IRA against an unpriced synced sale rendered TradeSimulator's red
+"⚠️ loss permanently disallowed (IRA)" panel — asserting a permanent tax
+consequence for a loss that was never confirmed. Fixed by hardcoding
+`isIraPermanent: false` on that branch (matching the sell-side uncheckable
+branch, which already did this) and splitting TradeSimulator's wash-sale
+panel into a third, amber "can't fully check" state whenever
+`triggers.length === 0`, rather than only red/red-IRA. Pinned by a new
+`washSale.test.ts` case.
+
+**Browser-verified** (SnapTrade's sandbox returns account metadata and
+cash but no positions/BUY/SELL activity — see the sandbox-limitation note
+below — so `deriveSales` had nothing to replay through it; sales import
+was instead exercised by seeding three `source: 'snaptrade'` rows directly
+under `tanush.yarram@gmail.com`'s synced "Individual"/"IRA" accounts, one
+priced loss + two null-basis, spanning NVDA and MSFT): the sales table
+shows a "Synced" badge with grey "Unknown"/"—" cells for the two
+null-basis rows; buying NVDA (null-basis-only evidence) renders the amber
+"Can't fully check this for a wash sale" panel in **both** the taxable and
+the IRA account (confirming the isIraPermanent fix — a stray `true` here
+would have shown the red IRA panel instead); buying MSFT (one confirmed
+loss + one null-basis) renders the red panel with the loss trigger plus
+the amber "Additionally, ..." caveat line in the taxable account, and
+escalates to the red "⚠️ permanently disallowed (IRA)" panel in the IRA
+account. All five checks passed. Seeded rows deleted after; the four
+lots (NVDA/MSFT/KO/JNJ) seeded alongside them were kept as gmail's demo
+portfolio rather than deleted — see the demo-data paragraph below.
+
+**Sandbox limitation, worth knowing for any future SnapTrade work:** the
+configured sandbox institution (`SNAPTRADE_CLIENT_ID`/`SNAPTRADE_CONSUMER_KEY`,
+test key) returns cash balance and account metadata on connect, but no
+positions and no BUY/SELL activity — `reconcileLots`/`deriveSales` have
+nothing to reconstruct from it. Slice 1's lot-sync path was verified
+against this same sandbox and still holds (a synced account can be empty
+and that's a legitimate outcome), but slice 2a's FIFO sale replay has
+**never been exercised against a real SnapTrade activity feed** — only
+against seeded rows shaped like what the replay would produce. One more
+reason the production-key approval (see Phase 2 slice 1 above) is the
+real unlock, not just for real brokerages but for testing this path at
+all.
+
+**`tanush.yarram@icloud.com` no longer exists** — the account (and its
+accounts/lots/sales via cascade) was gone from `auth.users` as of
+2026-08-07; it's not just an SMTP sign-in issue, the row itself is
+deleted. `tanush.yarram@gmail.com` is now the **only** user and the one to
+test against. Its demo portfolio: taxable "Individual" (NVDA/MSFT/KO/JNJ,
+manual lots seeded during this session, weighted so Information Technology
+trips the concentration threshold) and traditional-IRA "IRA", both
+SnapTrade-linked (`sync_source: 'snaptrade'`, accounts 13/14) with cash
+synced from the sandbox ($25,000/$12,500) but no synced lots (see the
+sandbox limitation above — nothing to sync). **Also found and removed
+this session:** two other manual accounts (ids 11/12) existed with the
+exact same display names, "Individual" and "IRA" — empty shells that
+predated any real data, colliding in name with the real synced 13/14 with
+no way to tell them apart in the UI (`createAccount`/`upsertSnapTradeAccount`
+in `queries.ts` have no name-collision check against each other). Testing
+landed a stray manual lot in each by mistake; both accounts were deleted
+outright rather than just clearing the lots, since they had no purpose
+besides the collision. **Real gap, not fixed:** nothing stops this from
+recurring — a manual "add account" flow or a future SnapTrade link that
+happens to reuse a display name like "Individual" will silently collide
+again. Worth a UI account-picker disambiguator (e.g. show sync source
+next to the name) if this keeps causing confusion, but out of scope for
+Phase 2 slice 2/Phase 3 as currently understood.
 
 ## The 4-phase roadmap to production readiness
 
 **Where this stands right now:** Phase 1 is closed. Phase 2 slice 1 is
-live; slice 2 (below) is the natural next unit of work on this project.
-Phase 3 has two of four items done; the other two (Sentry, privacy/ToS)
-are unstarted and don't depend on anything else — either can be picked up
-any time. Phase 4 hasn't started and depends on nothing in Phases 2-3, so
-it's an independent track if getting real users becomes the priority over
-more brokerage-sync depth.
+live; slice 2 is now two-thirds done (2a, 2c — see below), with 2b the
+one remaining piece and it's blocked on a design decision, not just
+unstarted. Phase 3 has two of four items done; the other two (Sentry,
+privacy/ToS) are unstarted and don't depend on anything else — either can
+be picked up any time. Phase 4 hasn't started and depends on nothing in
+Phases 2-3, so it's an independent track if getting real users becomes
+the priority over more brokerage-sync depth.
 
 1. **Hostable at all** (auth + hosted DB + deploy) — **closed.**
 2. **Cut onboarding friction** — SnapTrade brokerage sync, replacing
@@ -200,17 +310,39 @@ more brokerage-sync depth.
      phase mattering to a real user. Disconnecting a connection keeps its
      synced accounts/lots as a frozen snapshot (flips `sync_source` to
      `manual`, clears the link) rather than deleting them.
-   - **Slice 2 — not started.** Three independent pieces, buildable in
-     any order: (a) sales-history import — SnapTrade's BUY/SELL activity
-     is already fetched but only used for cost-basis reconstruction,
-     nothing writes to `sales`, so realized gains from a synced account
-     can't show up in Tax Check yet; (b) scheduled/automatic re-sync — a
-     Vercel Cron hitting `syncAccounts()` for every linked connection,
-     today it's purely user-initiated; (c) broken-connection detection —
-     the `disabled` column exists and is read into the UI already but
-     nothing ever writes it, needs either (b)'s cron to poll
-     `listBrokerageAuthorizations` or an error-path check inside
-     `syncOneAccount` when a sync call fails in an auth-revoked way.
+   - **Slice 2 — (a) and (c) live, (b) blocked.** Three independent
+     pieces:
+     - **(a) sales-history import — live.** SnapTrade's BUY/SELL activity
+       is FIFO-replayed into `sales` rows (`deriveSales.ts`), including a
+       null-basis path for sales the history can't fully price (see the
+       Database section's "Sales import" entry above). This was more than
+       a roadmap checkbox — before this, a brokerage-synced account's
+       loss sales were invisible to `checkWashSale`'s buy side, so a user
+       who'd only ever synced (never manually entered a sale) got a
+       confidently wrong "no wash sale" verdict. Realized gains from
+       synced accounts can now show up in Tax Check; short/long-term
+       reconstruction for *manually* recorded sales still can't (see
+       above).
+     - **(c) broken-connection detection — live, no cron needed.**
+       `syncOneAccount` catches a `fetchHoldings` failure, and when
+       `isAuthRevokedError` says it's a 401/403 (not a transient
+       429/5xx), flags `brokerage_connections.disabled` — cleared
+       automatically on the next successful sync. Turned out not to need
+       (b)'s cron or a `listBrokerageAuthorizations` poll at all; both
+       were speculative solutions written before anyone had looked at
+       what `syncOneAccount`'s error path could already do.
+     - **(b) scheduled/automatic re-sync — still not started, and now
+       understood to be blocked, not just undone.** A Vercel Cron hitting
+       `syncAccounts()` for every linked connection needs a way to act
+       across users, but `syncAccounts()` runs through the cookie-bound,
+       RLS-scoped `createClient()`, and there is **no
+       `SUPABASE_SERVICE_ROLE_KEY` anywhere, by design** (see Database
+       section). A cron route would also need a `PUBLIC_PATHS` entry in
+       `src/lib/supabase/proxy.ts` or it's redirected to `/login` like
+       every other unauthenticated request. Needs an explicit decision —
+       introduce a service-role client for this one case, or do
+       stale-on-page-load re-sync under the user's own session instead of
+       a cron — before picking this back up.
 3. **Trust & polish.** Rate-limiting the AI endpoints (`ai_rate_limits`,
    5 combined Claude calls/hour/user) and encrypting the SnapTrade
    `user_secret` at rest (`src/lib/encryption.ts`, AES-256-GCM) are

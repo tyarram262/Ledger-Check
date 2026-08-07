@@ -221,56 +221,83 @@ export default function TradeSimulator({ accounts }: { accounts: Account[] }) {
             {result.verdictSentence}
           </div>
 
-          {result.washSale && (
-            <div
-              className={
-                result.washSale.isIraPermanent
-                  ? "rounded-lg border-2 border-red-400 bg-red-100 p-5"
-                  : "rounded-lg border border-red-200 bg-red-50 p-5"
-              }
-            >
-              <h3 className="font-semibold text-red-800">
-                {result.washSale.isIraPermanent
-                  ? "⚠️ Wash sale — loss permanently disallowed (IRA)"
-                  : "Wash-sale warning"}
-              </h3>
-              <ul className="mt-2 list-disc pl-5 text-sm text-red-700">
-                {result.washSale.triggers.map((t) => (
-                  <li key={`${t.date}-${t.accountName}`}>
-                    {t.date}: {t.description}
-                    {t.isIra && (
-                      <span className="ml-1.5 rounded bg-red-200 px-1.5 py-0.5 text-xs font-medium text-red-800">
-                        IRA
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 text-sm text-red-700">{result.washSale.message}</p>
-              {result.washSale.uncheckableLots.length > 0 && (
-                <p className="mt-2 text-sm text-amber-700">
-                  Additionally, {result.washSale.uncheckableLots.reduce((sum, l) => sum + l.shares, 0)}{" "}
-                  {result.washSale.uncheckableLots[0].ticker} shares (synced with no known purchase
-                  date) couldn&apos;t be checked against the 30-day window.
+          {result.washSale && (() => {
+            // An empty trigger list means the only evidence was an
+            // uncheckable lot/sale (no known date/basis) — nothing has
+            // actually been confirmed as a wash sale (see washSale.ts's
+            // uncheckable branches, which all hardcode isIraPermanent:
+            // false for the same reason). That gets its own amber "can't
+            // verify" treatment instead of the red "confirmed" panel, so
+            // the heading and footer never assert an outcome the message
+            // right below them says isn't confirmed.
+            const unconfirmed = result.washSale.triggers.length === 0;
+            return (
+              <div
+                className={
+                  unconfirmed
+                    ? "rounded-lg border border-amber-200 bg-amber-50 p-5"
+                    : result.washSale.isIraPermanent
+                      ? "rounded-lg border-2 border-red-400 bg-red-100 p-5"
+                      : "rounded-lg border border-red-200 bg-red-50 p-5"
+                }
+              >
+                <h3 className={unconfirmed ? "font-semibold text-amber-800" : "font-semibold text-red-800"}>
+                  {unconfirmed
+                    ? "Can't fully check this for a wash sale"
+                    : result.washSale.isIraPermanent
+                      ? "⚠️ Wash sale — loss permanently disallowed (IRA)"
+                      : "Wash-sale warning"}
+                </h3>
+                {!unconfirmed && (
+                  <ul className="mt-2 list-disc pl-5 text-sm text-red-700">
+                    {result.washSale.triggers.map((t) => (
+                      <li key={`${t.date}-${t.accountName}`}>
+                        {t.date}: {t.description}
+                        {t.isIra && (
+                          <span className="ml-1.5 rounded bg-red-200 px-1.5 py-0.5 text-xs font-medium text-red-800">
+                            IRA
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className={unconfirmed ? "mt-2 text-sm text-amber-700" : "mt-2 text-sm text-red-700"}>
+                  {result.washSale.message}
                 </p>
-              )}
-              {result.washSale.isIraPermanent ? (
-                <p className="mt-2 text-xs text-red-600">
-                  This is worse than a same-taxable-account wash sale: because
-                  the replacement shares sit in an IRA, the loss can never be
-                  recovered by adding it to a future cost basis — it&apos;s
-                  gone for good (Rev. Rul. 2008-5). This check is binary — any
-                  ticker match flags, regardless of share counts.
-                </p>
-              ) : (
-                <p className="mt-2 text-xs text-red-600">
-                  This check is binary — any ticker match flags, regardless of
-                  share counts. The IRS disallows the loss proportionally to
-                  replacement shares.
-                </p>
-              )}
-            </div>
-          )}
+                {!unconfirmed && result.washSale.uncheckableLots.length > 0 && (
+                  <p className="mt-2 text-sm text-amber-700">
+                    Additionally, {result.washSale.uncheckableLots.reduce((sum, l) => sum + l.shares, 0)}{" "}
+                    {result.washSale.uncheckableLots[0].ticker} shares (synced with no known purchase
+                    date) couldn&apos;t be checked against the 30-day window.
+                  </p>
+                )}
+                {!unconfirmed && result.washSale.uncheckableSales.length > 0 && (
+                  <p className="mt-2 text-sm text-amber-700">
+                    Additionally, a sale of {result.washSale.uncheckableSales.reduce((sum, s) => sum + s.shares, 0)}{" "}
+                    {result.washSale.uncheckableSales[0].ticker} shares (synced with no known cost
+                    basis) couldn&apos;t be confirmed as a loss.
+                  </p>
+                )}
+                {!unconfirmed &&
+                  (result.washSale.isIraPermanent ? (
+                    <p className="mt-2 text-xs text-red-600">
+                      This is worse than a same-taxable-account wash sale: because
+                      the replacement shares sit in an IRA, the loss can never be
+                      recovered by adding it to a future cost basis — it&apos;s
+                      gone for good (Rev. Rul. 2008-5). This check is binary — any
+                      ticker match flags, regardless of share counts.
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs text-red-600">
+                      This check is binary — any ticker match flags, regardless of
+                      share counts. The IRS disallows the loss proportionally to
+                      replacement shares.
+                    </p>
+                  ))}
+              </div>
+            );
+          })()}
 
           {result.futureRebuyNote && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">

@@ -33,6 +33,19 @@ export interface UncheckableLot {
   accountName: string;
 }
 
+/** A same-ticker sale with no known cost basis (see `types.ts`'s `Sale` —
+ *  populated by a brokerage sync whose activity history couldn't fully
+ *  explain what was sold; `deriveSales.ts`) within the 30-day window. It
+ *  CANNOT be proven to not be a loss sale, so — same reasoning as
+ *  `UncheckableLot` — it's surfaced as a caveat on a buy rather than
+ *  silently passing the check. Under-warning is the dangerous direction. */
+export interface UncheckableSale {
+  ticker: string;
+  shares: number;
+  saleDate: string;
+  accountName: string;
+}
+
 export interface WashSaleWarning {
   kind: "buy-after-loss" | "sell-with-recent-buy";
   ticker: string;
@@ -50,6 +63,10 @@ export interface WashSaleWarning {
    *  after this sell — can't be checked against the 30-day window. Usually
    *  empty; see `UncheckableLot`. */
   uncheckableLots: UncheckableLot[];
+  /** Same-ticker sales with no known cost basis within the 30-day window
+   *  before a buy — can't be confirmed as a loss sale. Usually empty; see
+   *  `UncheckableSale`. */
+  uncheckableSales: UncheckableSale[];
 }
 
 function isIraAccount(accounts: Account[], accountId: number | undefined): boolean {
@@ -152,18 +169,63 @@ export function checkWashSale(
     const lossSales = sales.filter(
       (s) =>
         s.ticker === ticker &&
+        s.realizedGainLoss !== null &&
         s.realizedGainLoss < 0 &&
         daysBetween(s.saleDate, today) >= 0 &&
         daysBetween(s.saleDate, today) <= WASH_SALE_WINDOW_DAYS
     );
-    if (lossSales.length === 0) return null;
+
+    // Same-ticker sales with no known cost basis (a brokerage sync whose
+    // activity history was too shallow to price them — see `deriveSales.ts`)
+    // within the window — CANNOT be proven to not be a loss sale, so
+    // surfaced as a caveat rather than silently passing (see
+    // `UncheckableSale`). Under-warning is the dangerous direction here.
+    const uncheckableSales: UncheckableSale[] = sales
+      .filter(
+        (s) =>
+          s.ticker === ticker &&
+          s.realizedGainLoss === null &&
+          daysBetween(s.saleDate, today) >= 0 &&
+          daysBetween(s.saleDate, today) <= WASH_SALE_WINDOW_DAYS
+      )
+      .map((s) => ({ ticker, shares: s.shares, saleDate: s.saleDate, accountName: s.accountName }));
+
+    if (lossSales.length === 0 && uncheckableSales.length === 0) return null;
+
+    if (lossSales.length === 0) {
+      // Only uncheckable sales — can't confirm a wash sale, but can't clear
+      // it either (mirrors the sell side's "uncheckable lots" branch below).
+      // isIraPermanent is hardcoded false, not computed from the buy account:
+      // "permanently disallowed" is a claim about a confirmed loss, and this
+      // branch has no confirmed loss to make that claim about. Same reasoning
+      // as the sell-side uncheckable branch below.
+      const totalShares = uncheckableSales.reduce((sum, s) => sum + s.shares, 0);
+      const latestSaleDate = uncheckableSales
+        .map((s) => s.saleDate)
+        .sort()
+        .at(-1)!;
+      const windowClearsOn = addDays(latestSaleDate, WASH_SALE_WINDOW_DAYS + 1);
+      return {
+        kind: "buy-after-loss",
+        ticker,
+        triggers: [],
+        windowClearsOn,
+        isIraPermanent: false,
+        uncheckableLots: [],
+        uncheckableSales,
+        message: `Can't fully check this buy for a wash sale — ${totalShares} shares of ${ticker} you sold within the last 30 days have no known cost basis (likely from a brokerage sync with limited history), so we can't confirm whether that sale was a loss.`,
+      };
+    }
 
     // The replacement shares are this buy itself — its account is what matters.
+    // Only computed here, for the confirmed-loss path — see the uncheckable
+    // branch above for why that one hardcodes isIraPermanent: false instead.
     const isIraPermanent = isIraAccount(accounts, trade.accountId);
+
     const triggers = lossSales.map((s) => ({
       date: s.saleDate,
       accountName: s.accountName,
-      description: `Sold ${s.shares} ${ticker} at a $${Math.abs(s.realizedGainLoss).toFixed(2)} loss in ${s.accountName}`,
+      description: `Sold ${s.shares} ${ticker} at a $${Math.abs(s.realizedGainLoss!).toFixed(2)} loss in ${s.accountName}`,
       isIra: isIraAccount(accounts, s.accountId),
     }));
     const latestSaleDate = lossSales
@@ -178,6 +240,7 @@ export function checkWashSale(
       windowClearsOn,
       isIraPermanent,
       uncheckableLots: [],
+      uncheckableSales,
       message: isIraPermanent
         ? `Buying ${ticker} now would trigger a wash sale — and because the repurchase is in an IRA, the loss from your ${latestSaleDate} sale is PERMANENTLY disallowed (it can never be added back to cost basis, per Rev. Rul. 2008-5). The window clears on ${windowClearsOn}.`
         : `Buying ${ticker} now would trigger a wash sale — the loss from your ${latestSaleDate} sale would be disallowed and rolled into the cost basis of these new shares. The window clears on ${windowClearsOn}.`,
@@ -228,6 +291,7 @@ export function checkWashSale(
       windowClearsOn: today,
       isIraPermanent: false,
       uncheckableLots,
+      uncheckableSales: [],
       message: `Can't fully check this sale for a wash sale — ${totalShares} shares of ${ticker} you'd still hold have no known purchase date (likely from a brokerage sync with limited history), so we can't confirm they were bought more than 30 days ago.`,
     };
   }
@@ -252,6 +316,7 @@ export function checkWashSale(
     windowClearsOn,
     isIraPermanent,
     uncheckableLots,
+    uncheckableSales: [],
     message: isIraPermanent
       ? `Selling ${ticker} at a loss now would trigger a wash sale — you bought shares on ${latestBuyDate} in an IRA that you'd still hold, so the loss is PERMANENTLY disallowed (per Rev. Rul. 2008-5), not just deferred. The window clears on ${windowClearsOn}.`
       : `Selling ${ticker} at a loss now would trigger a wash sale — you bought shares on ${latestBuyDate} that you'd still hold, so the loss would be disallowed and added to those shares' cost basis. The window clears on ${windowClearsOn}.`,

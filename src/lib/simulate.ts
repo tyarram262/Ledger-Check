@@ -139,17 +139,30 @@ export function simulateTrade(
     move = `This trade would lower your ${noun} from ${Math.round(beforePct)}% to ${Math.round(afterPct)}%`;
   }
 
+  // `triggers` can be empty — `checkWashSale` also returns a warning (never
+  // `null`) when the only evidence is an uncheckable lot/sale with no known
+  // date/basis (see `washSale.ts`'s `UncheckableLot`/`UncheckableSale`). That
+  // case can't name a specific date/account, so it gets its own clause
+  // rather than `.at(-1)!` throwing on an empty array.
   let washClause: string;
   if (washSale?.kind === "buy-after-loss") {
-    const t = washSale.triggers.at(-1)!;
-    washClause = washSale.isIraPermanent
-      ? ` and would trigger a wash sale — because the repurchase is in an IRA, the loss from your ${t.date} ${ticker} sale in ${t.accountName} would be PERMANENTLY disallowed`
-      : ` and would trigger a wash sale — the loss from your ${t.date} ${ticker} sale in ${t.accountName} would be disallowed`;
+    const t = washSale.triggers.at(-1);
+    if (t) {
+      washClause = washSale.isIraPermanent
+        ? ` and would trigger a wash sale — because the repurchase is in an IRA, the loss from your ${t.date} ${ticker} sale in ${t.accountName} would be PERMANENTLY disallowed`
+        : ` and would trigger a wash sale — the loss from your ${t.date} ${ticker} sale in ${t.accountName} would be disallowed`;
+    } else {
+      washClause = " and can't be fully checked for a wash sale — a recent sale of this ticker has no known cost basis";
+    }
   } else if (washSale?.kind === "sell-with-recent-buy") {
-    const t = washSale.triggers.at(-1)!;
-    washClause = washSale.isIraPermanent
-      ? ` and would trigger a wash sale — you bought ${ticker} on ${t.date} in an IRA (${t.accountName}), so this loss would be PERMANENTLY disallowed`
-      : ` and would trigger a wash sale — you bought ${ticker} on ${t.date} (${t.accountName}), so this loss would be disallowed`;
+    const t = washSale.triggers.at(-1);
+    if (t) {
+      washClause = washSale.isIraPermanent
+        ? ` and would trigger a wash sale — you bought ${ticker} on ${t.date} in an IRA (${t.accountName}), so this loss would be PERMANENTLY disallowed`
+        : ` and would trigger a wash sale — you bought ${ticker} on ${t.date} (${t.accountName}), so this loss would be disallowed`;
+    } else {
+      washClause = " and can't be fully checked for a wash sale — some shares you'd still hold have no known purchase date";
+    }
   } else {
     washClause = " and doesn't trigger a wash sale";
   }

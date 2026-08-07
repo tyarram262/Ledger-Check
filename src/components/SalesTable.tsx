@@ -39,7 +39,14 @@ export default function SalesTable({ sales }: { sales: Sale[] }) {
         <tbody>
           {sales.map((sale) => (
             <tr key={sale.id} className="border-b border-slate-100">
-              <td className="py-2 pr-3 font-medium">{sale.ticker}</td>
+              <td className="py-2 pr-3 font-medium">
+                {sale.ticker}
+                {sale.source === "snaptrade" && (
+                  <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-normal text-slate-500">
+                    Synced
+                  </span>
+                )}
+              </td>
               <td className="py-2 pr-3 text-slate-600">{sale.accountName}</td>
               <td className="py-2 pr-3 text-right">
                 {formatShares(sale.shares)}
@@ -48,16 +55,24 @@ export default function SalesTable({ sales }: { sales: Sale[] }) {
                 {formatUsd(sale.salePricePerShare)}
               </td>
               <td className="py-2 pr-3 text-right">
-                {formatUsd(sale.costPerShare)}
+                {sale.costPerShare === null ? (
+                  <span className="text-slate-400" title="No known cost basis — the brokerage's transaction history didn't go back far enough to determine it.">
+                    Unknown
+                  </span>
+                ) : (
+                  formatUsd(sale.costPerShare)
+                )}
               </td>
               <td
                 className={`py-2 pr-3 text-right font-medium ${
-                  sale.realizedGainLoss < 0
-                    ? "text-red-600"
-                    : "text-emerald-600"
+                  sale.realizedGainLoss === null
+                    ? "text-slate-400"
+                    : sale.realizedGainLoss < 0
+                      ? "text-red-600"
+                      : "text-emerald-600"
                 }`}
               >
-                {formatUsd(sale.realizedGainLoss)}
+                {sale.realizedGainLoss === null ? "—" : formatUsd(sale.realizedGainLoss)}
               </td>
               <td className="py-2 pr-3 text-slate-600">{sale.saleDate}</td>
               <td className="py-2 text-right">

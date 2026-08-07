@@ -58,6 +58,24 @@ describe("simulateTrade — buys", () => {
     expect(outcome.result.verdictSentence).toContain("PERMANENTLY disallowed");
   });
 
+  it("doesn't crash on an empty-triggers wash-sale warning (only an uncheckable, null-basis sale)", () => {
+    // Regression test: `checkWashSale` returns a non-null warning with
+    // `triggers: []` when the only evidence is a same-ticker sale with no
+    // known cost basis (see washSale.ts's uncheckable-sale branch) — the
+    // verdict-sentence builder used to assume `triggers.at(-1)!` was always
+    // non-null and threw a TypeError here.
+    const outcome = simulateTrade(
+      { side: "buy", ticker: "NVDA", shares: 1, pricePerShare: 150, accountId: 1 },
+      [makeLot({ ticker: "JPM", shares: 100, costPerShare: 100 })],
+      [makeSale({ ticker: "NVDA", saleDate: "2026-06-23", costPerShare: null, source: "snaptrade" })],
+      ACCOUNTS,
+      TODAY
+    );
+    if (!outcome.ok) throw new Error(outcome.error);
+    expect(outcome.result.washSale?.triggers).toHaveLength(0);
+    expect(outcome.result.verdictSentence).toContain("can't be fully checked");
+  });
+
   it("severity is ok for a small diversifying buy", () => {
     const lots = [
       makeLot({ ticker: "AAPL", shares: 1, costPerShare: 100 }),

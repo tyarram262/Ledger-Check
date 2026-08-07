@@ -144,6 +144,85 @@ describe("checkWashSale — buy side", () => {
   });
 });
 
+describe("checkWashSale — sales with no known cost basis", () => {
+  it("surfaces an uncheckable-sale caveat instead of silently passing when the only recent sale has no basis", () => {
+    const sales = [
+      makeSale({ ticker: "PYPL", saleDate: "2026-06-23", costPerShare: null, source: "snaptrade" }),
+    ];
+    const warning = checkWashSale(
+      { side: "buy", ticker: "PYPL", shares: 5, pricePerShare: 200, accountId: 1 },
+      sales,
+      [],
+      ACCOUNTS,
+      TODAY
+    );
+    expect(warning).not.toBeNull();
+    expect(warning?.triggers).toHaveLength(0);
+    expect(warning?.uncheckableSales).toHaveLength(1);
+    expect(warning?.message).toContain("no known cost basis");
+  });
+
+  it("reports both a real loss trigger and a separate uncheckable sale", () => {
+    const sales = [
+      makeSale({ ticker: "PYPL", saleDate: "2026-06-23" }), // real loss, default fixture basis
+      makeSale({
+        ticker: "PYPL",
+        saleDate: "2026-06-25",
+        costPerShare: null,
+        accountId: 2,
+        accountName: "Vanguard Roth",
+        source: "snaptrade",
+      }),
+    ];
+    const warning = checkWashSale(
+      { side: "buy", ticker: "PYPL", shares: 1, pricePerShare: 1, accountId: 1 },
+      sales,
+      [],
+      ACCOUNTS,
+      TODAY
+    );
+    expect(warning?.kind).toBe("buy-after-loss");
+    expect(warning?.triggers).toHaveLength(1);
+    expect(warning?.uncheckableSales).toHaveLength(1);
+    expect(warning?.uncheckableSales[0].accountName).toBe("Vanguard Roth");
+  });
+
+  it("never reports isIraPermanent on an unconfirmed wash sale, even when the buy is into an IRA", () => {
+    // Only evidence is a null-basis synced sale — nothing has been
+    // confirmed as a loss, so isIraPermanent must stay false regardless of
+    // the buy account. A stray `true` here would render TradeSimulator's
+    // "loss permanently disallowed (IRA)" panel for an unconfirmed sale.
+    const sales = [
+      makeSale({ ticker: "PYPL", saleDate: "2026-06-23", costPerShare: null, source: "snaptrade" }),
+    ];
+    const warning = checkWashSale(
+      { side: "buy", ticker: "PYPL", shares: 5, pricePerShare: 200, accountId: 3 }, // IRA
+      sales,
+      [],
+      ACCOUNTS,
+      TODAY
+    );
+    expect(warning?.kind).toBe("buy-after-loss");
+    expect(warning?.triggers).toHaveLength(0);
+    expect(warning?.isIraPermanent).toBe(false);
+  });
+
+  it("ignores a null-basis sale outside the 30-day window", () => {
+    const sales = [
+      makeSale({ ticker: "PYPL", saleDate: "2026-05-01", costPerShare: null, source: "snaptrade" }),
+    ];
+    expect(
+      checkWashSale(
+        { side: "buy", ticker: "PYPL", shares: 1, pricePerShare: 1, accountId: 1 },
+        sales,
+        [],
+        ACCOUNTS,
+        TODAY
+      )
+    ).toBeNull();
+  });
+});
+
 describe("checkWashSale — sell side", () => {
   it("flags a loss sell when recently bought shares would still be held", () => {
     const lots = [

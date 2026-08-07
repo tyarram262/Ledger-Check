@@ -1,4 +1,4 @@
-import { snapTradeProvider, isSnapTradeConfigured } from "@/lib/brokerage/snaptrade";
+import { snapTradeProvider, isSnapTradeConfigured, isAuthRevokedError } from "@/lib/brokerage/snaptrade";
 import type { BrokerageAccount } from "@/lib/brokerage/types";
 import {
   getCurrentUserId,
@@ -8,8 +8,10 @@ import {
   upsertSnapTradeAccount,
   listSnapTradeAccountLinks,
   upsertSyncedLots,
+  upsertSyncedSales,
   updateAccountCash,
   touchConnectionSynced,
+  setConnectionDisabled,
   listBrokerageConnections,
   detachAccountsFromConnection,
   deleteBrokerageConnection,
@@ -109,16 +111,42 @@ export interface SyncSummary {
   accountId: number;
   lotsSynced: number;
   lotsRemoved: number;
+  salesImported: number;
   cashUpdated: boolean;
   warnings: string[];
 }
 
+/**
+ * Syncs one account's holdings, cash, and realized-sale history.
+ *
+ * On a fetch failure whose status indicates the brokerage authorization
+ * itself was revoked or disabled (`isAuthRevokedError` — 401/403, not a
+ * transient 429/5xx/network blip), flags the connection via
+ * `setConnectionDisabled` before rethrowing, so the "needs attention at the
+ * brokerage" badge (`BrokerageConnect.tsx`) shows up without the user
+ * having to notice a silently-stale sync themselves. `syncAccounts`'
+ * `allSettled` turns the rethrow into a per-account warning either way; this
+ * only adds the persistent flag on top for the specific case that's
+ * actually actionable (reconnect at the brokerage) rather than just "try
+ * again later".
+ */
 async function syncOneAccount(
   creds: { externalUserId: string; userSecret: string },
   link: { accountId: number; snaptradeAccountId: string; connectionId: number | null }
 ): Promise<SyncSummary> {
-  const { lots, cash, warnings } = await snapTradeProvider.fetchHoldings(creds, link.snaptradeAccountId);
+  let holdings: Awaited<ReturnType<typeof snapTradeProvider.fetchHoldings>>;
+  try {
+    holdings = await snapTradeProvider.fetchHoldings(creds, link.snaptradeAccountId);
+  } catch (err) {
+    if (link.connectionId != null && isAuthRevokedError(err)) {
+      await setConnectionDisabled(link.connectionId, true);
+    }
+    throw err;
+  }
+  const { lots, sales, cash, warnings } = holdings;
+
   const { upserted, removed } = await upsertSyncedLots(link.accountId, lots);
+  const { upserted: salesImported } = await upsertSyncedSales(link.accountId, sales);
 
   let cashUpdated = false;
   if (cash != null) {
@@ -126,9 +154,19 @@ async function syncOneAccount(
     cashUpdated = true;
   }
   if (link.connectionId != null) {
+    // Also clears `disabled` — a successful sync is itself proof the
+    // connection has recovered from whatever set it (see
+    // `touchConnectionSynced`'s doc comment).
     await touchConnectionSynced(link.connectionId);
   }
-  return { accountId: link.accountId, lotsSynced: upserted, lotsRemoved: removed, cashUpdated, warnings };
+  return {
+    accountId: link.accountId,
+    lotsSynced: upserted,
+    lotsRemoved: removed,
+    salesImported,
+    cashUpdated,
+    warnings,
+  };
 }
 
 /** Syncs one linked account (`onlyAccountId`) or every linked account.
@@ -153,6 +191,7 @@ export async function syncAccounts(onlyAccountId?: number): Promise<SyncSummary[
           accountId: links[i].accountId,
           lotsSynced: 0,
           lotsRemoved: 0,
+          salesImported: 0,
           cashUpdated: false,
           warnings: [result.reason instanceof Error ? result.reason.message : "Sync failed for this account."],
         }

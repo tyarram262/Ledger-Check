@@ -21,8 +21,8 @@ import { addDays, todayIso } from "@/lib/dates";
  */
 
 export const DEMO_ACCOUNTS: Account[] = [
-  { id: 1, name: "Taxable Brokerage", type: "taxable", cashBalance: 2500 },
-  { id: 2, name: "Traditional IRA", type: "traditional_ira", cashBalance: 1200 },
+  { id: 1, name: "Taxable Brokerage", type: "taxable", cashBalance: 2500, isSample: false },
+  { id: 2, name: "Traditional IRA", type: "traditional_ira", cashBalance: 1200, isSample: false },
 ];
 
 const TAXABLE_ID = 1;

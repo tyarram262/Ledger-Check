@@ -4,22 +4,31 @@ import type { FilingStatus } from "@/lib/taxRates";
 import { horizonReviewDate, type JournalEntry, type TimeHorizon } from "@/lib/journal";
 import { decryptSecret, encryptSecret } from "@/lib/encryption";
 
+const ACCOUNT_SELECT = "id, name, type, cash_balance, is_sample";
+
 interface AccountRow {
   id: number;
   name: string;
   type: AccountType;
   cash_balance: number;
+  is_sample: boolean;
 }
 
 function mapAccount(r: AccountRow): Account {
-  return { id: r.id, name: r.name, type: r.type, cashBalance: r.cash_balance };
+  return {
+    id: r.id,
+    name: r.name,
+    type: r.type,
+    cashBalance: r.cash_balance,
+    isSample: r.is_sample,
+  };
 }
 
 export async function listAccounts(): Promise<Account[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("accounts")
-    .select("id, name, type, cash_balance")
+    .select(ACCOUNT_SELECT)
     .order("id");
   if (error) throw new Error(error.message);
   return ((data ?? []) as AccountRow[]).map(mapAccount);
@@ -27,16 +36,38 @@ export async function listAccounts(): Promise<Account[]> {
 
 export async function createAccount(
   name: string,
-  type: AccountType
+  type: AccountType,
+  options?: { isSample?: boolean; cashBalance?: number }
 ): Promise<Account> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("accounts")
-    .insert({ name, type })
-    .select("id, name, type, cash_balance")
+    .insert({
+      name,
+      type,
+      is_sample: options?.isSample ?? false,
+      ...(options?.cashBalance !== undefined ? { cash_balance: options.cashBalance } : {}),
+    })
+    .select(ACCOUNT_SELECT)
     .single();
   if (error) throw new Error(error.message);
   return mapAccount(data as AccountRow);
+}
+
+/** Deletes every account this user has flagged `is_sample` (and, via
+ *  `ON DELETE CASCADE`, their lots/sales — `journal_entries` survives via
+ *  `ON DELETE SET NULL` plus its denormalized snapshot, same as any other
+ *  account deletion). RLS-scoped and id-less by design: this can only ever
+ *  remove sample data, never a real account. Returns the count removed. */
+export async function deleteSampleAccounts(): Promise<number> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("accounts")
+    .delete()
+    .eq("is_sample", true)
+    .select("id");
+  if (error) throw new Error(error.message);
+  return (data ?? []).length;
 }
 
 /** Creates (or, on a rerun of Link for the same brokerage account, reuses)
@@ -62,7 +93,7 @@ export async function upsertSnapTradeAccount(input: {
       },
       { onConflict: "user_id,snaptrade_account_id" }
     )
-    .select("id, name, type, cash_balance")
+    .select(ACCOUNT_SELECT)
     .single();
   if (error) throw new Error(error.message);
   return mapAccount(data as AccountRow);

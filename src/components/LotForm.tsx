@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Account } from "@/lib/types";
+import { resolveAccountId } from "@/lib/accounts";
 import TickerHint from "@/components/TickerHint";
 import JournalPrompt, { type JournalPromptTarget } from "@/components/JournalPrompt";
 
@@ -10,6 +11,10 @@ export default function LotForm({ accounts }: { accounts: Account[] }) {
   const router = useRouter();
   const today = new Date().toISOString().slice(0, 10);
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? 0);
+  // `router.refresh()` re-renders this component with fresh `accounts` but
+  // preserves its state, so `accountId` can point at an account that didn't
+  // exist yet when this form mounted — see `resolveAccountId`'s doc comment.
+  const selectedAccountId = resolveAccountId(accounts, accountId);
   const [ticker, setTicker] = useState("");
   const [shares, setShares] = useState("");
   const [costPerShare, setCostPerShare] = useState("");
@@ -26,7 +31,7 @@ export default function LotForm({ accounts }: { accounts: Account[] }) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        accountId,
+        accountId: selectedAccountId,
         ticker,
         shares: Number(shares),
         costPerShare: Number(costPerShare),
@@ -61,7 +66,7 @@ export default function LotForm({ accounts }: { accounts: Account[] }) {
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-slate-600">Account</span>
           <select
-            value={accountId}
+            value={selectedAccountId}
             onChange={(e) => setAccountId(Number(e.target.value))}
             className="rounded border border-slate-300 bg-white px-2 py-1.5"
           >

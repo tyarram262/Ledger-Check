@@ -1,5 +1,5 @@
 @AGENTS.md
-# Session handoff — READ THIS FIRST (updated 2026-08-07, Phase 4 slice 1: public landing page + no-signup demo)
+# Session handoff — READ THIS FIRST (updated 2026-08-08, Phase 4 slice 2: fixed the first-run trap on /holdings)
 
 Two layers below this one: **"Mission & how to work here"** (the north
 star — how to think about features and write code in this repo) and
@@ -289,10 +289,12 @@ live; slice 2 is now two-thirds done (2a, 2c — see below), with 2b the
 one remaining piece and it's blocked on a design decision, not just
 unstarted. **Phase 3 is fully closed** — rate-limiting, encryption, Sentry,
 and privacy/ToS are all done (2026-08-07). **Phase 4 slice 1 (public
-landing page + no-signup live demo) is done as of 2026-08-07** — see below
-for the funnel it's built around and what's still open. The highest-value
-next step is fixing the first-run trap on `/holdings` (a new signup
-currently dead-ends there), not more of Phase 2 or 3.
+landing page + no-signup live demo) is done as of 2026-08-07, and slice 2
+(fixing the first-run trap on `/holdings`) is done as of 2026-08-08** — see
+below for the funnel and what's still open. The highest-value next step now
+is analytics on the funnel (nothing measures landing → demo → signup →
+sample-portfolio → retained yet), or filing for SnapTrade production-key
+approval, not more of Phase 2 or 3.
 
 1. **Hostable at all** (auth + hosted DB + deploy) — **closed.**
 2. **Cut onboarding friction** — SnapTrade brokerage sync, replacing
@@ -405,7 +407,8 @@ currently dead-ends there), not more of Phase 2 or 3.
      once that's done. Not yet verified: a real event landing in a live
      Sentry dashboard, since no DSN exists yet to test against.
 4. **Get users — slice 1 (public front door + no-signup demo) done
-   2026-08-07.** The funnel this phase is built around:
+   2026-08-07, slice 2 (fixed the `/holdings` first-run trap) done
+   2026-08-08.** The funnel this phase is built around:
 
    **public page → live demo → signup → first insight → retained → paid.**
 
@@ -416,9 +419,9 @@ currently dead-ends there), not more of Phase 2 or 3.
    only marketing copy anywhere was the `<head>` description string nobody
    reads. There was no way to see the product's value without an email
    round-trip, and no way to see it *after* signing up either, since a
-   brand-new account starts with zero holdings (see the first-run trap
-   below). A large paying audience was never reachable behind that wall,
-   independent of any pricing/billing question.
+   brand-new account started with zero holdings (see the first-run trap,
+   fixed in slice 2 below). A large paying audience was never reachable
+   behind that wall, independent of any pricing/billing question.
 
    **What's live now:**
    - `src/components/Landing.tsx`, rendered by `src/app/page.tsx` for
@@ -487,16 +490,9 @@ currently dead-ends there), not more of Phase 2 or 3.
    per this doc's existing verification standard) and any OG-card
    preview check on a real sharing surface (Reddit/Discord/Slack unfurl).
 
-   **What's still open, in rough priority order:**
-   - **First-run trap — the highest-value next slice.** Nothing seeds a
-     default account for a new user. On `/holdings`, the "Add a holding"
-     button is `disabled={... || accounts.length === 0}` (`LotForm.tsx`,
-     same guard in `CsvImport.tsx` and `SaleForm.tsx`) with **no copy
-     anywhere explaining why the button is greyed out.** Today's funnel is
-     landing → demo → signup → dead end: a brand-new signed-in user hits
-     this wall before reaching a single real insight. This slice fixed the
-     top of the funnel; this is the very next segment and it's currently
-     broken.
+   **What was still open after slice 1 (now addressed by slice 2 below,
+   except where noted):**
+   - ~~First-run trap~~ — **fixed in slice 2, 2026-08-08.** See below.
    - **SnapTrade production key still not approved** — only the sandbox
      institution works, so no real brokerage (Fidelity/Schwab/Robinhood)
      connects for an actual new user. External approval lead time; filing
@@ -518,6 +514,89 @@ currently dead-ends there), not more of Phase 2 or 3.
      public landing page actively inviting outside traffic makes a stale
      table a live liability rather than a dormant one — worth flagging to
      whoever owns the annual update.
+
+   **Slice 2 (fixing the first-run trap) — done 2026-08-08.** A brand-new
+   signup landed on `/` → the zero-lots welcome screen → `/holdings`, where
+   the "Accounts" section rendered an invisible empty list under copy about
+   editing cash balances, the working `AccountForm` sat unexplained below
+   it, and the three real forms (`LotForm`/`CsvImport`/`SaleForm`) were
+   greyed out via `accounts.length === 0` with zero copy saying why. **Found
+   during this slice, worse than that:** every account `<select>` seeds its
+   `useState` from `accounts[0]?.id ?? 0` at mount, and `AccountForm`'s
+   `router.refresh()` is a *soft* refresh — it re-renders those components
+   with fresh `accounts` props but never remounts them, so a picker that
+   mounted at zero accounts stayed stuck at `0`. Even a user who found and
+   used `AccountForm` had their very next "Add holding" submit rejected with
+   "Unknown account." — the one escape hatch was broken the first time
+   anyone used it.
+
+   **What's live now:**
+   - **`accounts.is_sample boolean not null default false`** (migration
+     `accounts_is_sample`) — `Account.isSample` in `types.ts`, threaded
+     through `listAccounts`/`createAccount`/`upsertSnapTradeAccount` in
+     `queries.ts`. `deleteSampleAccounts()` is a new RLS-scoped,
+     id-less `.delete().eq("is_sample", true)` — it structurally cannot
+     touch a real account, and needs no orphan cleanup: `lots`/`sales` are
+     `ON DELETE CASCADE` on `account_id` and `journal_entries` is
+     `ON DELETE SET NULL` (verified live against the schema, same as every
+     other account-deletion path in this app).
+   - **`src/lib/samplePortfolio.ts`** — `sampleSeedPlan(today)`, a pure
+     function deriving a starter-portfolio seed plan from the *same*
+     `demoLots()`/`demoSales()` fixture `/demo` runs (`demoPortfolio.ts`),
+     so the landing page's pitch, the no-signup demo, and this seeded
+     starter portfolio can't drift into telling three different stories.
+     Discards the fixture's own row ids (its `nextId` counter isn't safe to
+     persist) and prefixes both account names `Sample …` so they can't
+     collide with a real or SnapTrade-linked "Individual"/"IRA" (the exact
+     collision recorded earlier in this doc). 6 new tests
+     (`samplePortfolio.test.ts`).
+   - **`POST`/`DELETE /api/sample-portfolio`** (`src/app/api/sample-portfolio/route.ts`)
+     — `POST` 409s if the user already has any account (this is a zero-state
+     unblock, not a general "load fixture data" tool), otherwise creates the
+     two `is_sample` accounts and their lots/sale via `createAccount`/
+     `createLot`/`createSale` (never `bulkCreateLots`, which hardcodes
+     `source: "csv"` — these are seeded as `"manual"` since that's what they
+     actually are). `DELETE` calls `deleteSampleAccounts()`, 404s on zero
+     rows removed. No Postgres transaction (supabase-js has none — same
+     constraint noted on `record_sell` elsewhere in this doc); a mid-seed
+     failure is self-healing because every partial row is still `is_sample`
+     and "Remove sample data" clears it.
+   - **`SamplePortfolioButton.tsx`** / **`SampleDataBanner.tsx`** — the
+     "Load a sample portfolio" CTA and the removable amber "you're looking
+     at sample data" banner, both mirroring `AccountForm.tsx`'s
+     fetch/`router.refresh()` shape.
+   - **`src/lib/accounts.ts`'s `resolveAccountId(accounts, selected)`** —
+     the fix for the stale-picker bug above: falls back to the first
+     account whenever the stored selection no longer resolves in the
+     current list. Applied in `LotForm.tsx`, `CsvImport.tsx`,
+     `SaleForm.tsx`, and `TradeSimulator.tsx` (same soft-refresh risk on
+     `/simulate`) — one pure, unit-tested helper (`accounts.test.ts`)
+     instead of four inline `useEffect` resyncs.
+   - **`/holdings`' zero-accounts state** now renders only a "Start here"
+     section — `SamplePortfolioButton`, then `AccountForm` under copy that
+     actually introduces it, then `BrokerageConnect` (already self-hides
+     without SnapTrade keys) — instead of three dead forms. The normal
+     three-section layout is unchanged once an account exists, plus
+     `SampleDataBanner` when `isSample` is set on any account.
+   - **`/`'s zero-lots welcome screen** offers `SamplePortfolioButton` as
+     the primary CTA when the user also has zero accounts (an "Add my own
+     holdings →" link to `/holdings` stays secondary), and shows
+     `SampleDataBanner` above the real dashboard once sample data exists.
+
+   **Verified:** `npm test` (206 tests, up from 197), `tsc`/`eslint`/`next
+   build` clean, `mcp__supabase__get_advisors` clean (same pre-existing
+   warnings as before: leaked-password-protection, three unrelated
+   unused-index infos), and the migration + `is_sample` column confirmed
+   live against the schema — the existing user's 8 real accounts all read
+   back `is_sample: false` after applying it. **Not yet done — needs a
+   browser, which this environment doesn't have:** a real click-through as
+   a brand-new signup (the existing `tanush.yarram@gmail.com` account
+   already has accounts, so the zero-state isn't reachable from it) —
+   sign up a throwaway address via the already-live Resend SMTP, load the
+   sample portfolio, confirm the IRA-permanent wash-sale panel and
+   concentration/overlap all render on the seeded NVDA buy, remove the
+   sample data, and confirm manual account-then-holding entry now succeeds
+   on the first try without a reload.
 
 ---
 

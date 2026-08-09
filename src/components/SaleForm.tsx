@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Account } from "@/lib/types";
+import { resolveAccountId } from "@/lib/accounts";
 import TickerHint from "@/components/TickerHint";
 
 export default function SaleForm({ accounts }: { accounts: Account[] }) {
   const router = useRouter();
   const today = new Date().toISOString().slice(0, 10);
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? 0);
+  const selectedAccountId = resolveAccountId(accounts, accountId);
   const [ticker, setTicker] = useState("");
   const [shares, setShares] = useState("");
   const [salePricePerShare, setSalePricePerShare] = useState("");
@@ -30,7 +32,7 @@ export default function SaleForm({ accounts }: { accounts: Account[] }) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        accountId,
+        accountId: selectedAccountId,
         ticker,
         shares: Number(shares),
         salePricePerShare: Number(salePricePerShare),
@@ -57,7 +59,7 @@ export default function SaleForm({ accounts }: { accounts: Account[] }) {
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-slate-600">Account</span>
           <select
-            value={accountId}
+            value={selectedAccountId}
             onChange={(e) => setAccountId(Number(e.target.value))}
             className="rounded border border-slate-300 bg-white px-2 py-1.5"
           >

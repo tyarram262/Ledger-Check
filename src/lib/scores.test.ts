@@ -18,8 +18,8 @@ import { DEFAULT_TAX_PROFILE, type TaxProfile } from "@/lib/taxRates";
 
 const TODAY = "2026-07-03";
 const ACCOUNTS: Account[] = [
-  { id: 1, name: "Taxable Brokerage", type: "taxable", cashBalance: 0 },
-  { id: 2, name: "Vanguard Roth", type: "roth", cashBalance: 0 },
+  { id: 1, name: "Taxable Brokerage", type: "taxable", cashBalance: 0, isSample: false },
+  { id: 2, name: "Vanguard Roth", type: "roth", cashBalance: 0, isSample: false },
 ];
 
 describe("gradeFor", () => {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getConcentrationThreshold, listLots } from "@/lib/queries";
+import { getConcentrationThreshold, listAccounts, listLots } from "@/lib/queries";
 import {
   concentrationVerdict,
   sectorAllocation,
@@ -15,6 +15,8 @@ import DigestCard from "@/components/DigestCard";
 import RefreshPricesButton from "@/components/RefreshPricesButton";
 import HealthScoreCard from "@/components/HealthScoreCard";
 import Landing from "@/components/Landing";
+import SamplePortfolioButton from "@/components/SamplePortfolioButton";
+import SampleDataBanner from "@/components/SampleDataBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,7 @@ export default async function DashboardPage() {
   }
 
   const lots = await listLots();
+  const accounts = await listAccounts();
   const quotes = await getStoredQuotes([...new Set(lots.map((l) => l.ticker))]);
   const prices = toPriceMap(quotes);
   const positions = buildPositions(lots, prices);
@@ -56,20 +59,33 @@ export default async function DashboardPage() {
         </h1>
         <p className="mt-3 text-sm text-slate-500">
           Get a plain-English gut check on sector concentration and wash-sale
-          risk before you place a trade. Start by entering what you own.
+          risk before you place a trade.
         </p>
-        <Link
-          href="/holdings"
-          className="mt-6 inline-block rounded bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-700"
-        >
-          Add your holdings
-        </Link>
+        {accounts.length === 0 ? (
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <SamplePortfolioButton />
+            <Link
+              href="/holdings"
+              className="text-sm text-slate-500 underline hover:text-slate-700"
+            >
+              Add my own holdings →
+            </Link>
+          </div>
+        ) : (
+          <Link
+            href="/holdings"
+            className="mt-6 inline-block rounded bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-700"
+          >
+            Add your holdings
+          </Link>
+        )}
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {accounts.some((a) => a.isSample) && <SampleDataBanner />}
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <div className="flex flex-wrap items-baseline gap-3">

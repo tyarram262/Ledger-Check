@@ -6,9 +6,9 @@ import type { Account } from "@/lib/types";
 const TODAY = "2026-07-03";
 
 const ACCOUNTS: Account[] = [
-  { id: 1, name: "Taxable Brokerage", type: "taxable", cashBalance: 0 },
-  { id: 2, name: "Vanguard Roth", type: "roth", cashBalance: 0 },
-  { id: 3, name: "Fidelity Traditional IRA", type: "traditional_ira", cashBalance: 0 },
+  { id: 1, name: "Taxable Brokerage", type: "taxable", cashBalance: 0, isSample: false },
+  { id: 2, name: "Vanguard Roth", type: "roth", cashBalance: 0, isSample: false },
+  { id: 3, name: "Fidelity Traditional IRA", type: "traditional_ira", cashBalance: 0, isSample: false },
 ];
 
 describe("checkWashSale — buy side", () => {

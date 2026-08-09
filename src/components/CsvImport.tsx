@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Account } from "@/lib/types";
+import { resolveAccountId } from "@/lib/accounts";
 
 interface ImportSummary {
   imported: number;
@@ -13,6 +14,7 @@ export default function CsvImport({ accounts }: { accounts: Account[] }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? 0);
+  const selectedAccountId = resolveAccountId(accounts, accountId);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -28,7 +30,7 @@ export default function CsvImport({ accounts }: { accounts: Account[] }) {
     const res = await fetch("/api/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ accountId, csv }),
+      body: JSON.stringify({ accountId: selectedAccountId, csv }),
     });
     const body = await res.json().catch(() => null);
     setPending(false);
@@ -56,7 +58,7 @@ export default function CsvImport({ accounts }: { accounts: Account[] }) {
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-slate-600">Into account</span>
           <select
-            value={accountId}
+            value={selectedAccountId}
             onChange={(e) => setAccountId(Number(e.target.value))}
             className="rounded border border-slate-300 bg-white px-2 py-1.5"
           >

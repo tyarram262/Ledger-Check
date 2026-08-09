@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Account } from "@/lib/types";
 import type { SimulationResult, Severity } from "@/lib/simulate";
+import { resolveAccountId } from "@/lib/accounts";
 import { formatUsd } from "@/lib/format";
 import TickerHint from "@/components/TickerHint";
 import OverlapPanel from "@/components/OverlapPanel";
@@ -62,6 +63,10 @@ export default function TradeSimulator({ accounts, demo = false }: TradeSimulato
   const [accountId, setAccountId] = useState(
     demo ? DEMO_SUGGESTED_TRADE.accountId : (accounts[0]?.id ?? 0)
   );
+  // Same soft-refresh staleness `resolveAccountId` guards against on
+  // `/holdings` — a live account created just before this page loads
+  // shouldn't leave the picker pointing at a stale/nonexistent id.
+  const selectedAccountId = resolveAccountId(accounts, accountId);
   const [rationale, setRationale] = useState("");
   const [reviewText, setReviewText] = useState<string | null>(null);
   const [result, setResult] = useState<SimulationResult | null>(null);
@@ -75,7 +80,7 @@ export default function TradeSimulator({ accounts, demo = false }: TradeSimulato
     ticker,
     shares: Number(shares),
     pricePerShare: Number(pricePerShare),
-    accountId,
+    accountId: selectedAccountId,
   };
 
   async function handleSimulate(e: React.FormEvent) {
@@ -185,7 +190,7 @@ export default function TradeSimulator({ accounts, demo = false }: TradeSimulato
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-600">Account</span>
             <select
-              value={accountId}
+              value={selectedAccountId}
               onChange={(e) => setAccountId(Number(e.target.value))}
               className="rounded border border-slate-300 bg-white px-2 py-1.5"
             >

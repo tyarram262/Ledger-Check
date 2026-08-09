@@ -7,6 +7,8 @@ import HoldingsTable from "@/components/HoldingsTable";
 import SalesTable from "@/components/SalesTable";
 import CsvImport from "@/components/CsvImport";
 import BrokerageConnect from "@/components/BrokerageConnect";
+import SamplePortfolioButton from "@/components/SamplePortfolioButton";
+import SampleDataBanner from "@/components/SampleDataBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +17,42 @@ export default async function HoldingsPage() {
   const lots = await listLots();
   const sales = await listSales();
   const journalEntries = await listJournalEntries();
+  const hasSampleData = accounts.some((a) => a.isSample);
+
+  // Zero accounts: every form below needs one first (`accounts.length === 0`
+  // disables their submit buttons with no explanation — see CLAUDE.md's
+  // Phase 4 slice 2). Rather than show three greyed-out forms, show only
+  // the one thing that unblocks them.
+  if (accounts.length === 0) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Holdings</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Enter what you own and any recent sales. The wash-sale check
+            looks across every account here — including IRAs.
+          </p>
+        </div>
+
+        <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="text-base font-semibold">Start here</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Everything else on this page needs at least one account first.
+          </p>
+          <div className="mt-4">
+            <SamplePortfolioButton />
+          </div>
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <h3 className="mb-2 text-sm font-semibold text-slate-700">
+              …or add your own account
+            </h3>
+            <AccountForm />
+          </div>
+          <BrokerageConnect />
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -25,6 +63,8 @@ export default async function HoldingsPage() {
           across every account here — including IRAs.
         </p>
       </div>
+
+      {hasSampleData && <SampleDataBanner />}
 
       <section className="rounded-lg border border-slate-200 bg-white p-5">
         <h2 className="text-base font-semibold">Accounts</h2>

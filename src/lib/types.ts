@@ -11,6 +11,10 @@ export interface Account {
   name: string;
   type: AccountType;
   cashBalance: number;
+  /** True for accounts seeded by "Load a sample portfolio" on the
+   *  first-run zero-state (`samplePortfolio.ts`) — lets the UI show a
+   *  removable-sample-data banner and scopes `deleteSampleAccounts`. */
+  isSample: boolean;
 }
 
 export type LotSource = "manual" | "csv" | "snaptrade";
